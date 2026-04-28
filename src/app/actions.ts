@@ -1,0 +1,198 @@
+'use server';
+
+import { supabaseAdmin } from '@/lib/supabase';
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import type { AttachmentCategory } from '@/lib/types';
+
+// ─── AUTH ──────────────────────────────────────────────────────────────────
+
+export async function loginAction(formData: FormData) {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (authError || !authData.user) {
+    return { error: authError?.message || 'Invalid credentials' };
+  }
+
+  // Fetch role from users table
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single();
+
+  if (!user) return { error: 'User profile not found.' };
+
+  // Store session token in cookie
+  const cookieStore = await cookies();
+  cookieStore.set('session_token', authData.session?.access_token || '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 8, // 8 hours
+    path: '/',
+  });
+  cookieStore.set('user_id', authData.user.id, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 8,
+    path: '/',
+  });
+  cookieStore.set('user_role', user.role, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 8,
+    path: '/',
+  });
+
+  if (user.role === 'DOCTOR') redirect('/doctor/dashboard');
+  if (user.role === 'RECEPTIONIST') redirect('/receptionist/dashboard');
+  return { error: 'Unknown role' };
+}
+
+export async function logoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete('session_token');
+  cookieStore.delete('user_id');
+  cookieStore.delete('user_role');
+  redirect('/login');
+}
+
+// ─── APPOINTMENTS ──────────────────────────────────────────────────────────
+
+export async function createAppointmentAction(data: {
+  patient_id: string;
+  doctor_id: string;
+  service_id: string;
+  start_time: string;
+  end_time: string;
+  chief_complaint?: string;
+}) {
+  const { error } = await supabaseAdmin.from('appointments').insert({
+    id: crypto.randomUUID(),
+    ...data,
+    status: 'SCHEDULED',
+    created_at: new Date().toISOString(),
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/receptionist/dashboard');
+  return { success: true };
+}
+
+export async function updateAppointmentStatusAction(id: string, status: string) {
+  const { error } = await supabaseAdmin
+    .from('appointments')
+    .update({ status })
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/receptionist/dashboard');
+  revalidatePath('/doctor/dashboard');
+  return { success: true };
+}
+
+// ─── PATIENTS ──────────────────────────────────────────────────────────────
+
+export async function createPatientAction(formData: FormData) {
+  const { count } = await supabaseAdmin
+    .from('patients')
+    .select('*', { count: 'exact', head: true });
+
+  const patient_id = `EDS-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+
+  const { data: patient, error } = await supabaseAdmin.from('patients').insert({
+    id: crypto.randomUUID(),
+    patient_id,
+    first_name: formData.get('first_name') as string,
+    last_name: formData.get('last_name') as string,
+    date_of_birth: formData.get('date_of_birth') as string,
+    gender: formData.get('gender') as string,
+    contact_number: formData.get('contact_number') as string,
+    email: formData.get('email') as string || null,
+    address: formData.get('address') as string || null,
+    medical_history: formData.get('medical_history') as string || null,
+    allergies: formData.get('allergies') as string || null,
+    has_bleeding_disorder: formData.get('has_bleeding_disorder') === 'true',
+    created_at: new Date().toISOString(),
+  }).select().single();
+
+  if (error) return { error: error.message };
+  revalidatePath('/receptionist/patients');
+  return { patient };
+}
+
+// ─── VISITS ────────────────────────────────────────────────────────────────
+
+export async function createVisitAction(formData: FormData, patientId: string, doctorId: string) {
+  const { data: visit, error } = await supabaseAdmin.from('visits').insert({
+    id: crypto.randomUUID(),
+    patient_id: patientId,
+    doctor_id: doctorId,
+    appointment_id: formData.get('appointment_id') as string || null,
+    tooth_numbers: formData.get('tooth_numbers') as string || null,
+    chief_complaint: formData.get('chief_complaint') as string || null,
+    procedure_performed: formData.get('procedure_performed') as string || null,
+    medical_notes: formData.get('medical_notes') as string || null,
+    diagnosis: formData.get('diagnosis') as string || null,
+    prescription: formData.get('prescription') as string || null,
+    total_cost: formData.get('total_cost') ? parseFloat(formData.get('total_cost') as string) : null,
+    amount_paid: formData.get('amount_paid') ? parseFloat(formData.get('amount_paid') as string) : null,
+    visit_date: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).select().single();
+
+  if (error || !visit) return { error: error?.message || 'Unknown error' };
+
+  // Handle file attachments
+  const fileCount = parseInt((formData.get('fileCount') as string) || '0');
+  for (let i = 0; i < fileCount; i++) {
+    const file = formData.get(`file_${i}`) as File;
+    const category = (formData.get(`category_${i}`) as AttachmentCategory) || 'OTHER';
+    if (file && file.size > 0) {
+      await supabaseAdmin.from('attachments').insert({
+        id: crypto.randomUUID(),
+        visit_id: visit.id,
+        patient_id: patientId,
+        file_name: file.name,
+        file_type: file.type,
+        storage_path: `/uploads/${visit.id}/${file.name}`,
+        file_size_bytes: file.size,
+        category,
+        uploaded_by_id: doctorId,
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  revalidatePath(`/doctor/patients/${patientId}`);
+  return { visit };
+}
+
+export async function deleteVisitAction(visitId: string, patientId: string) {
+  const { error } = await supabaseAdmin.from('visits').delete().eq('id', visitId);
+  if (error) return { error: error.message };
+  revalidatePath(`/doctor/patients/${patientId}`);
+  return { success: true };
+}
+
+export async function updateVisitAction(visitId: string, patientId: string, formData: FormData) {
+  const { error } = await supabaseAdmin.from('visits').update({
+    tooth_numbers: formData.get('tooth_numbers') as string || null,
+    chief_complaint: formData.get('chief_complaint') as string || null,
+    procedure_performed: formData.get('procedure_performed') as string || null,
+    medical_notes: formData.get('medical_notes') as string || null,
+    diagnosis: formData.get('diagnosis') as string || null,
+    prescription: formData.get('prescription') as string || null,
+    total_cost: formData.get('total_cost') ? parseFloat(formData.get('total_cost') as string) : null,
+    amount_paid: formData.get('amount_paid') ? parseFloat(formData.get('amount_paid') as string) : null,
+    updated_at: new Date().toISOString(),
+  }).eq('id', visitId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/doctor/patients/${patientId}`);
+  return { success: true };
+}

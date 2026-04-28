@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+:root {
+  --navy-950: #070E1A;
+  --navy-900: #0B1220;
+  --navy-800: #0F1B2E;
+  --navy-700: #152340;
+  --navy-600: #1A2D52;
+  --navy-500: #213665;
+
+  --gold: #C9A84C;
+  --gold-light: #E8C97A;
+  --gold-dark: #A87E30;
+
+  --emerald: #10B981;
+  --emerald-light: #34D399;
+  --emerald-dark: #059669;
+
+  --offwhite: #F0EDE8;
+  --offwhite-muted: #C8C4BC;
+
+  --crimson: #DC2626;
+  --amber: #F59E0B;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  background-color: var(--navy-900);
+  color: var(--offwhite);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--navy-800);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--navy-600);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-dark);
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(15, 27, 46, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 16px;
+}
+
+.glass-card-light {
+  background: rgba(21, 35, 64, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(201, 168, 76, 0.1);
+  border-radius: 12px;
+}
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, var(--gold-dark) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Premium button */
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  color: var(--navy-900);
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(201, 168, 76, 0.2);
+}
+.btn-gold:hover {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  box-shadow: 0 6px 20px rgba(201, 168, 76, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-emerald {
+  background: linear-gradient(135deg, var(--emerald-light), var(--emerald));
+  color: white;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+}
+.btn-emerald:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Input styling */
+.input-premium {
+  background: rgba(15, 27, 46, 0.8);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  color: var(--offwhite);
+  border-radius: 10px;
+  padding: 10px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  outline: none;
+}
+.input-premium::placeholder {
+  color: rgba(200, 196, 188, 0.4);
+}
+.input-premium:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.12);
+}
+.input-premium option {
+  background: var(--navy-800);
+  color: var(--offwhite);
+}
+
+/* Calendar styles */
+.cal-slot {
+  border-bottom: 1px solid rgba(201, 168, 76, 0.06);
+  transition: background 0.15s;
+  min-height: 48px;
+  position: relative;
+}
+.cal-slot:hover.cal-slot-available {
+  background: rgba(201, 168, 76, 0.06);
+  cursor: pointer;
+}
+.cal-slot-ghost {
+  background: rgba(201, 168, 76, 0.12) !important;
+  border: 2px dashed rgba(201, 168, 76, 0.4) !important;
+  border-radius: 6px;
+}
+
+/* Fade-in animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+/* Pulse glow */
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(201, 168, 76, 0); }
+}
+.pulse-gold {
+  animation: pulseGold 2s infinite;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  background: rgba(7, 14, 26, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+/* Badge colors */
+.badge-xray { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+.badge-lab { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+.badge-photo { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+.badge-prescription { background: rgba(201, 168, 76, 0.2); color: #e8c97a; border: 1px solid rgba(201,168,76,0.3); }
+.badge-other { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
