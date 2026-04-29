@@ -7,8 +7,14 @@ import {
   AlertTriangle, Heart, Phone, Mail, Calendar, FileText,
   Plus, X, Printer, ChevronDown, ChevronUp, Upload, Pill,
   DollarSign, Stethoscope, Clock, Camera, FlaskConical, FileImage,
-  Trash2, Edit2
+  Trash2, Edit2, ZoomIn, ZoomOut, RotateCw, ExternalLink, Download
 } from 'lucide-react';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+function getPublicFileUrl(storagePath: string) {
+  // storagePath is like patients/<patientId>/<visitId>/<filename>
+  return `${SUPABASE_URL}/storage/v1/object/public/patient-files/${storagePath}`;
+}
 
 const CATEGORY_CONFIG = {
   X_RAY:        { label: 'X-Ray',         class: 'badge-xray',         icon: <FileImage className="w-3 h-3" /> },
@@ -28,7 +34,104 @@ interface Props {
 
 interface FileEntry { file: File; category: keyof typeof CATEGORY_CONFIG }
 
-// ─── Print Prescription Component ────────────────────────────────────────────
+// ─── File Viewer Modal ────────────────────────────────────────────────────────
+function FileViewerModal({ attachment, onClose }: { attachment: Attachment; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1);
+  const url = getPublicFileUrl(attachment.storage_path);
+  const isImage = attachment.file_type.startsWith('image/');
+  const isPdf = attachment.file_type === 'application/pdf';
+
+  // Close on backdrop click
+  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  // Keyboard close
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex flex-col"
+      style={{ background: 'rgba(4,8,16,0.96)', backdropFilter: 'blur(8px)' }}
+      onClick={handleBackdrop}
+    >
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-5 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(201,168,76,0.12)' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {(CATEGORY_CONFIG[attachment.category as keyof typeof CATEGORY_CONFIG] || CATEGORY_CONFIG.OTHER).icon}
+            <span className="text-sm font-medium truncate max-w-[240px]" style={{ color: '#E8E8F0' }}>{attachment.file_name}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isImage && (
+            <>
+              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
+                className="p-2 rounded-lg transition-all hover:scale-105"
+                style={{ background: 'rgba(255,255,255,0.07)', color: '#C9A84C' }} title="Zoom Out">
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-mono w-12 text-center" style={{ color: '#8A8A9A' }}>{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom(z => Math.min(5, z + 0.25))}
+                className="p-2 rounded-lg transition-all hover:scale-105"
+                style={{ background: 'rgba(255,255,255,0.07)', color: '#C9A84C' }} title="Zoom In">
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button onClick={() => setZoom(1)}
+                className="p-2 rounded-lg transition-all hover:scale-105"
+                style={{ background: 'rgba(255,255,255,0.07)', color: '#8A8A9A' }} title="Reset Zoom">
+                <RotateCw className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          <a href={url} target="_blank" rel="noreferrer"
+            className="p-2 rounded-lg transition-all hover:scale-105"
+            style={{ background: 'rgba(79,156,249,0.1)', color: '#4F9CF9', border: '1px solid rgba(79,156,249,0.2)' }} title="Open in new tab">
+            <ExternalLink className="w-4 h-4" />
+          </a>
+          <a href={url} download={attachment.file_name}
+            className="p-2 rounded-lg transition-all hover:scale-105"
+            style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }} title="Download">
+            <Download className="w-4 h-4" />
+          </a>
+          <button onClick={onClose}
+            className="p-2 rounded-lg transition-all hover:scale-105"
+            style={{ background: 'rgba(220,38,38,0.1)', color: '#FCA5A5', border: '1px solid rgba(220,38,38,0.2)' }} title="Close (Esc)">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto flex items-center justify-center p-6" onClick={handleBackdrop}>
+        {isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt={attachment.file_name}
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'center', transition: 'transform 0.2s ease', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }}
+          />
+        ) : isPdf ? (
+          <iframe src={url} className="w-full h-full rounded-xl" style={{ minHeight: '75vh', border: 'none' }} />
+        ) : (
+          <div className="text-center space-y-4">
+            <FileText className="w-16 h-16 mx-auto opacity-20" style={{ color: '#C9A84C' }} />
+            <p className="text-sm" style={{ color: '#8A8A9A' }}>{attachment.file_name}</p>
+            <a href={url} download={attachment.file_name}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gold">
+              <Download className="w-4 h-4" /> Download File
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUser }; patient: Patient }) {
   return (
     <div className="print-only fixed inset-0 bg-white text-black p-8 z-[100] hidden print:block">
@@ -60,7 +163,10 @@ function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUse
 // ─── Visit Timeline Item ──────────────────────────────────────────────────────
 function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit & { doctor: AppUser; attachments: Attachment[] }; patient: Patient; onEdit: () => void; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  const balance = (visit.total_cost || 0) - (visit.amount_paid || 0);
+  const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+  const thisVisitBalance = (visit.total_cost || 0) - (visit.amount_paid || 0);
+  const prevBalance = visit.previous_balance || 0;
+  const netBalance = prevBalance + thisVisitBalance;
 
   return (
     <div className="relative pl-8 pb-6">
@@ -93,10 +199,10 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
                 Tooth #{visit.tooth_numbers}
               </span>
             )}
-            {balance > 0 && (
+            {netBalance > 0 && (
               <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                 style={{ background: 'rgba(220,38,38,0.1)', color: '#EF4444', border: '1px solid rgba(220,38,38,0.25)' }}>
-                Balance: {balance.toFixed(2)} EGP
+                Balance: {netBalance.toFixed(2)} EGP
               </span>
             )}
             {/* File category badges */}
@@ -130,39 +236,78 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
             )}
 
             {/* Billing */}
-            {(visit.total_cost || visit.amount_paid) && (
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {[
-                  { label: 'Total', value: `${(visit.total_cost || 0).toFixed(2)} EGP`, color: '#E8E8F0' },
-                  { label: 'Paid', value: `${(visit.amount_paid || 0).toFixed(2)} EGP`, color: '#10B981' },
-                  { label: 'Balance', value: `${balance.toFixed(2)} EGP`, color: balance > 0 ? '#EF4444' : '#10B981' },
-                ].map(b => (
-                  <div key={b.label} className="rounded-xl p-2.5 text-center"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-xs mb-0.5" style={{ color: '#5A5A6A' }}>{b.label}</p>
-                    <p className="text-sm font-bold" style={{ color: b.color }}>{b.value}</p>
+            {(visit.total_cost || visit.amount_paid || visit.previous_balance) && (
+              <div className="mt-2 space-y-2">
+                {/* Carried-forward balance row */}
+                {prevBalance > 0 && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(220,38,38,0.07)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                    <p className="text-xs font-semibold" style={{ color: '#EF4444' }}>Previous Balance Carried Forward</p>
+                    <p className="text-sm font-bold" style={{ color: '#EF4444' }}>{prevBalance.toFixed(2)} EGP</p>
                   </div>
-                ))}
+                )}
+                {/* This visit grid */}
+                <div className={`grid gap-2 ${prevBalance > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                  {prevBalance > 0 && (
+                    <div className="rounded-xl p-2.5 text-center"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <p className="text-xs mb-0.5" style={{ color: '#5A5A6A' }}>This Visit</p>
+                      <p className="text-sm font-bold" style={{ color: '#E8E8F0' }}>{(visit.total_cost || 0).toFixed(2)} EGP</p>
+                    </div>
+                  )}
+                  {[
+                    { label: prevBalance > 0 ? 'Grand Total' : 'Total', value: `${(prevBalance + (visit.total_cost || 0)).toFixed(2)} EGP`, color: '#E8E8F0' },
+                    { label: 'Paid', value: `${(visit.amount_paid || 0).toFixed(2)} EGP`, color: '#10B981' },
+                    { label: 'Balance', value: `${netBalance.toFixed(2)} EGP`, color: netBalance > 0 ? '#EF4444' : '#10B981' },
+                  ].map(b => (
+                    <div key={b.label} className="rounded-xl p-2.5 text-center"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <p className="text-xs mb-0.5" style={{ color: '#5A5A6A' }}>{b.label}</p>
+                      <p className="text-sm font-bold" style={{ color: b.color }}>{b.value}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Attachments */}
             {visit.attachments && visit.attachments.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#6A6A7A' }}>Files</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#6A6A7A' }}>Files ({visit.attachments.length})</p>
+                <div className="space-y-1.5">
                   {visit.attachments.map(a => {
-                    const cat = CATEGORY_CONFIG[a.category] || CATEGORY_CONFIG.OTHER;
+                    const cat = CATEGORY_CONFIG[a.category as keyof typeof CATEGORY_CONFIG] || CATEGORY_CONFIG.OTHER;
                     return (
-                      <span key={a.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cat.class}`}>
-                        {cat.icon} {a.file_name}
-                      </span>
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setViewingFile(a)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all hover:scale-[1.01] group"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                        title={`View ${a.file_name}`}
+                      >
+                        {/* Category badge */}
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${cat.class}`}>
+                          {cat.icon} {cat.label}
+                        </span>
+                        {/* File name */}
+                        <span className="text-xs flex-1 truncate" style={{ color: '#C8C4BC' }}>{a.file_name}</span>
+                        {/* Size */}
+                        {a.file_size_bytes && (
+                          <span className="text-[10px] shrink-0" style={{ color: '#5A5A6A' }}>
+                            {(a.file_size_bytes / 1024).toFixed(0)} KB
+                          </span>
+                        )}
+                        <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: '#4F9CF9' }} />
+                      </button>
                     );
                   })}
                 </div>
               </div>
             )}
 
+            {/* File Viewer */}
+            {viewingFile && <FileViewerModal attachment={viewingFile} onClose={() => setViewingFile(null)} />}
             <div className="flex items-center justify-end gap-3 mt-4 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
               <button onClick={onEdit} className="text-xs flex items-center gap-1.5 transition-colors hover:text-blue-400" style={{ color: '#6A6A7A' }}>
                 <Edit2 className="w-3.5 h-3.5" /> Edit
@@ -194,7 +339,18 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [isPending, startTransition] = useTransition();
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
   const [formError, setFormError] = useState('');
+  const [visitCost, setVisitCost] = useState(0);
+  const [amountPaidNow, setAmountPaidNow] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
+
+  // Calculate total outstanding balance across ALL visits
+  const totalOutstandingBalance = visits.reduce((sum, v) => {
+    const visitBalance = (v.total_cost || 0) + (v.previous_balance || 0) - (v.amount_paid || 0);
+    return sum + visitBalance;
+  }, 0);
+  // Only carry forward if positive (patient owes money)
+  const carryForwardBalance = Math.max(0, totalOutstandingBalance);
 
   const handleVisitSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -366,47 +522,132 @@ export default function PatientProfileClient({ patient, visits, doctors, service
               <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: '#C9A84C' }}>
                 <DollarSign className="w-4 h-4" /> Billing
               </p>
+
+              {/* Previous Balance Banner — only shown when creating a new visit */}
+              {!editingVisit && carryForwardBalance > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)' }}>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#EF4444' }}>⚠ Previous Outstanding Balance</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#FCA5A5' }}>This amount will be carried forward to this visit</p>
+                  </div>
+                  <p className="text-lg font-black" style={{ color: '#EF4444' }}>{carryForwardBalance.toFixed(2)} EGP</p>
+                </div>
+              )}
+
+              {/* Hidden field to pass previous_balance to the server action */}
+              <input type="hidden" name="previous_balance" value={editingVisit ? (editingVisit.previous_balance || 0) : carryForwardBalance} />
+
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Total Cost (EGP)">
-                  <input name="total_cost" defaultValue={editingVisit?.total_cost || ''} type="number" step="0.01" min="0" placeholder="0.00" className="input-premium" />
+                <Field label="This Visit Cost (EGP)">
+                  <input
+                    name="total_cost"
+                    defaultValue={editingVisit?.total_cost || ''}
+                    type="number" step="0.01" min="0" placeholder="0.00"
+                    className="input-premium"
+                    onChange={e => setVisitCost(parseFloat(e.target.value) || 0)}
+                  />
                 </Field>
-                <Field label="Amount Paid (EGP)">
-                  <input name="amount_paid" defaultValue={editingVisit?.amount_paid || ''} type="number" step="0.01" min="0" placeholder="0.00" className="input-premium" />
+                <Field label="Amount Paid Today (EGP)">
+                  <input
+                    name="amount_paid"
+                    defaultValue={editingVisit?.amount_paid || ''}
+                    type="number" step="0.01" min="0" placeholder="0.00"
+                    className="input-premium"
+                    onChange={e => setAmountPaidNow(parseFloat(e.target.value) || 0)}
+                  />
                 </Field>
               </div>
+
+              {/* Live Billing Summary */}
+              {!editingVisit && (() => {
+                const grandTotal = carryForwardBalance + visitCost;
+                const remaining = grandTotal - amountPaidNow;
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#C9A84C' }}>Grand Total</p>
+                      <p className="text-xl font-black" style={{ color: '#C9A84C' }}>{grandTotal.toFixed(2)} EGP</p>
+                    </div>
+                    <div className="rounded-xl px-4 py-3 text-center" style={{ background: remaining > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${remaining > 0 ? 'rgba(220,38,38,0.25)' : 'rgba(16,185,129,0.25)'}` }}>
+                      <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: remaining > 0 ? '#EF4444' : '#10B981' }}>Remaining Balance</p>
+                      <p className="text-xl font-black" style={{ color: remaining > 0 ? '#EF4444' : '#10B981' }}>{remaining.toFixed(2)} EGP</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* File Uploads */}
-            <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(79,156,249,0.04)', border: '1px solid rgba(79,156,249,0.12)' }}>
-              <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: '#4F9CF9' }}>
-                <Upload className="w-4 h-4" /> Attachments
-              </p>
-              <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02]"
-                style={{ background: 'rgba(79,156,249,0.08)', border: '1px dashed rgba(79,156,249,0.3)', color: '#4F9CF9' }}>
-                <Plus className="w-4 h-4" />
-                <span className="text-sm font-medium">Add Files</span>
-                <input type="file" multiple className="hidden" onChange={addFile} />
-              </label>
-              {fileEntries.map((entry, idx) => (
-                <div key={idx} className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span className="text-xs flex-1 truncate" style={{ color: '#A0AEC0' }}>{entry.file.name}</span>
-                  <select
-                    value={entry.category}
-                    onChange={e => updateCategory(idx, e.target.value as keyof typeof CATEGORY_CONFIG)}
-                    className="input-premium text-xs py-1 pr-6"
-                    style={{ width: 140 }}
-                  >
-                    {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setFileEntries(prev => prev.filter((_, i) => i !== idx))}
-                    className="p-1 rounded-lg" style={{ color: '#EF4444' }}>
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+            <div
+              className="rounded-xl p-4 space-y-3"
+              style={{ background: isDragging ? 'rgba(79,156,249,0.1)' : 'rgba(79,156,249,0.04)', border: `1px ${isDragging ? 'solid' : 'solid'} ${isDragging ? 'rgba(79,156,249,0.5)' : 'rgba(79,156,249,0.12)'}`, transition: 'all 0.2s' }}
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={e => {
+                e.preventDefault();
+                setIsDragging(false);
+                const dropped = Array.from(e.dataTransfer.files);
+                setFileEntries(prev => [...prev, ...dropped.map(f => ({ file: f, category: 'OTHER' as const }))]);
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: '#4F9CF9' }}>
+                  <Upload className="w-4 h-4" /> Attachments
+                  {fileEntries.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(79,156,249,0.15)', color: '#4F9CF9' }}>
+                      {fileEntries.length} file{fileEntries.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all hover:scale-105 text-xs font-semibold"
+                  style={{ background: 'rgba(79,156,249,0.12)', border: '1px solid rgba(79,156,249,0.25)', color: '#4F9CF9' }}>
+                  <Plus className="w-3.5 h-3.5" /> Add Files
+                  <input type="file" multiple className="hidden" onChange={addFile} />
+                </label>
+              </div>
+
+              {/* Drop zone hint */}
+              {fileEntries.length === 0 && (
+                <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl cursor-pointer transition-all"
+                  style={{ border: '2px dashed rgba(79,156,249,0.25)', color: '#4A6A9A' }}>
+                  <Upload className="w-7 h-7 opacity-40" />
+                  <span className="text-sm font-medium" style={{ color: '#4F9CF9' }}>Drop files here or click to browse</span>
+                  <span className="text-xs" style={{ color: '#5A5A6A' }}>X-Rays · Lab Results · Clinical Photos · PDFs · Any file type</span>
+                  <input type="file" multiple className="hidden" onChange={addFile} />
+                </label>
+              )}
+
+              {/* File list */}
+              {fileEntries.length > 0 && (
+                <div className="space-y-2">
+                  {fileEntries.map((entry, idx) => (
+                    <div key={idx} className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {(CATEGORY_CONFIG[entry.category] || CATEGORY_CONFIG.OTHER).icon}
+                        <span className="text-xs truncate" style={{ color: '#A0AEC0' }}>{entry.file.name}</span>
+                        <span className="text-[10px] shrink-0" style={{ color: '#5A5A6A' }}>
+                          {(entry.file.size / 1024).toFixed(0)} KB
+                        </span>
+                      </div>
+                      <select
+                        value={entry.category}
+                        onChange={e => updateCategory(idx, e.target.value as keyof typeof CATEGORY_CONFIG)}
+                        className="input-premium text-xs py-1 pr-6 shrink-0"
+                        style={{ width: 130 }}
+                      >
+                        {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => setFileEntries(prev => prev.filter((_, i) => i !== idx))}
+                        className="p-1 rounded-lg shrink-0" style={{ color: '#EF4444' }}>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
 
             {formError && (

@@ -35,17 +35,14 @@ export async function loginAction(formData: FormData) {
   cookieStore.set('session_token', authData.session?.access_token || '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 8, // 8 hours
     path: '/',
   });
   cookieStore.set('user_id', authData.user.id, {
     httpOnly: true,
-    maxAge: 60 * 60 * 8,
     path: '/',
   });
   cookieStore.set('user_role', user.role, {
     httpOnly: true,
-    maxAge: 60 * 60 * 8,
     path: '/',
   });
 
@@ -90,6 +87,7 @@ export async function updateAppointmentStatusAction(id: string, status: string) 
     .eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/receptionist/dashboard');
+  revalidatePath('/receptionist/queue');
   revalidatePath('/doctor/dashboard');
   return { success: true };
 }
@@ -140,6 +138,7 @@ export async function createVisitAction(formData: FormData, patientId: string, d
     prescription: formData.get('prescription') as string || null,
     total_cost: formData.get('total_cost') ? parseFloat(formData.get('total_cost') as string) : null,
     amount_paid: formData.get('amount_paid') ? parseFloat(formData.get('amount_paid') as string) : null,
+    previous_balance: formData.get('previous_balance') ? parseFloat(formData.get('previous_balance') as string) : 0,
     visit_date: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -147,19 +146,38 @@ export async function createVisitAction(formData: FormData, patientId: string, d
 
   if (error || !visit) return { error: error?.message || 'Unknown error' };
 
-  // Handle file attachments
+  // Handle file attachments — upload to Supabase Storage
   const fileCount = parseInt((formData.get('fileCount') as string) || '0');
   for (let i = 0; i < fileCount; i++) {
     const file = formData.get(`file_${i}`) as File;
     const category = (formData.get(`category_${i}`) as AttachmentCategory) || 'OTHER';
     if (file && file.size > 0) {
+      // Build a unique storage path: patients/{patientId}/{visitId}/{originalName}
+      const ext = file.name.split('.').pop() || '';
+      const safeFileName = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+      const storagePath = `patients/${patientId}/${visit.id}/${safeFileName}`;
+
+      // Convert File to ArrayBuffer for server-side upload
+      const arrayBuffer = await file.arrayBuffer();
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('patient-files')
+        .upload(storagePath, arrayBuffer, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError.message);
+        // Still save the record even if upload fails, so data isn't lost
+      }
+
       await supabaseAdmin.from('attachments').insert({
         id: crypto.randomUUID(),
         visit_id: visit.id,
         patient_id: patientId,
         file_name: file.name,
         file_type: file.type,
-        storage_path: `/uploads/${visit.id}/${file.name}`,
+        storage_path: storagePath,
         file_size_bytes: file.size,
         category,
         uploaded_by_id: doctorId,

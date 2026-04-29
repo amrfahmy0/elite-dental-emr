@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 import InteractiveCalendar from '@/components/InteractiveCalendar';
+import QueuePanel from '@/components/QueuePanel';
 import { CalendarDays, Users, Clock, CheckCircle, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,7 +18,7 @@ export default async function ReceptionistDashboard() {
     supabaseAdmin.from('patients').select('*').order('created_at', { ascending: false }),
     supabaseAdmin.from('users').select('*').eq('role', 'DOCTOR'),
     supabaseAdmin.from('appointments')
-      .select(`*, patient:patients(*), service:services(*)`)
+      .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
       .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
       .lte('start_time', new Date(new Date().setHours(23,59,59,999)).toISOString())
       .order('start_time', { ascending: true }),
@@ -42,7 +43,7 @@ export default async function ReceptionistDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gold-gradient">Booking Calendar</h1>
+          <h1 className="text-2xl font-bold text-gold-gradient">Front Desk</h1>
           <p className="text-sm mt-0.5" style={{ color: '#6A6A7A' }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
@@ -69,14 +70,24 @@ export default async function ReceptionistDashboard() {
         ))}
       </div>
 
-      {/* Interactive Calendar */}
-      <div className="flex-1 min-h-0">
-        <InteractiveCalendar
-          appointments={appointments}
-          services={services}
-          patients={patients}
-          doctors={doctors}
-        />
+      {/* Two-column layout: Calendar + Queue */}
+      <div className="flex gap-5 flex-1 min-h-0">
+
+        {/* Interactive Calendar — takes most of the space */}
+        <div className="flex-1 min-h-0 min-w-0">
+          <InteractiveCalendar
+            appointments={appointments}
+            services={services}
+            patients={patients}
+            doctors={doctors}
+          />
+        </div>
+
+        {/* Queue Panel — right sidebar */}
+        <div className="w-96 shrink-0 overflow-y-auto rounded-2xl p-4"
+          style={{ background: 'rgba(7,14,26,0.7)', border: '1px solid rgba(201,168,76,0.1)' }}>
+          <QueuePanel initialQueue={todayAppts as any} role="RECEPTIONIST" />
+        </div>
       </div>
     </div>
   );

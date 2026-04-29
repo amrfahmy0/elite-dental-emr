@@ -76,6 +76,7 @@ export interface Visit {
   prescription?: string;
   total_cost?: number;
   amount_paid?: number;
+  previous_balance?: number;
   visit_date: string;
   created_at: string;
   updated_at: string;

@@ -19,8 +19,8 @@ export default async function ReceptionistLayout({ children }: { children: React
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar role="RECEPTIONIST" userName={user?.full_name || 'Receptionist'} />
-      <main className="flex-1 ml-64 overflow-y-auto" style={{ background: '#0B1220' }}>
-        <div className="p-8 min-h-screen">
+      <main className="flex-1 lg:ml-64 overflow-y-auto" style={{ background: '#0B1220' }}>
+        <div className="p-4 sm:p-8 pt-20 lg:pt-8 min-h-screen">
           {children}
         </div>
       </main>

@@ -6,8 +6,9 @@ import { logoutAction } from '@/app/actions';
 import { useTransition } from 'react';
 import {
   Stethoscope, LayoutDashboard, Users, CalendarDays,
-  FileText, LogOut, ChevronRight
+  FileText, LogOut, ChevronRight, Menu, X, ListChecks
 } from 'lucide-react';
+import { useState } from 'react';
 
 interface NavItem {
   label: string;
@@ -26,14 +27,16 @@ const doctorNav: NavItem[] = [
 ];
 
 const receptionistNav: NavItem[] = [
-  { label: 'Calendar', href: '/receptionist/dashboard', icon: <CalendarDays className="w-5 h-5" /> },
-  { label: 'Patients', href: '/receptionist/patients', icon: <Users className="w-5 h-5" /> },
+  { label: 'Calendar',    href: '/receptionist/dashboard',    icon: <CalendarDays className="w-5 h-5" /> },
+  { label: 'Queue',       href: '/receptionist/queue',        icon: <ListChecks className="w-5 h-5" /> },
+  { label: 'Patients',    href: '/receptionist/patients',     icon: <Users className="w-5 h-5" /> },
   { label: 'New Patient', href: '/receptionist/patients/new', icon: <FileText className="w-5 h-5" /> },
 ];
 
 export default function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  const [isOpen, setIsOpen] = useState(false);
   const navItems = role === 'DOCTOR' ? doctorNav : receptionistNav;
 
   const handleLogout = () => {
@@ -43,8 +46,28 @@ export default function Sidebar({ role, userName }: SidebarProps) {
   };
 
   return (
-    <aside className="w-64 h-screen flex flex-col fixed left-0 top-0 z-20"
-      style={{ background: 'linear-gradient(180deg, #070E1A 0%, #0B1220 100%)', borderRight: '1px solid rgba(201,168,76,0.1)' }}>
+    <>
+      {/* Mobile Toggle Button */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#C9A84C] text-[#070E1A] shadow-lg"
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+      </button>
+
+      {/* Overlay */}
+      {isOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      <aside className={`w-64 h-screen flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300 lg:translate-x-0 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
+        style={{ background: 'linear-gradient(180deg, #070E1A 0%, #0B1220 100%)', borderRight: '1px solid rgba(201,168,76,0.1)' }}>
+
       
       {/* Logo */}
       <div className="px-6 py-7 border-b" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
@@ -84,7 +107,7 @@ export default function Sidebar({ role, userName }: SidebarProps) {
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href} onClick={() => setIsOpen(false)}>
               <div className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                 isActive
                   ? 'text-[#070E1A]'
@@ -115,5 +138,6 @@ export default function Sidebar({ role, userName }: SidebarProps) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS public.visits (
   prescription        TEXT,
   total_cost          NUMERIC(10,2),
   amount_paid         NUMERIC(10,2),
+  previous_balance    NUMERIC(10,2) DEFAULT 0,
   visit_date          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
