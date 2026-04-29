@@ -23,10 +23,10 @@ export default async function DoctorCalendarPage() {
   );
 
   const stats = [
-    { label: "Today's Total", value: todayAppointments.length,                                                    color: '#C9A84C', icon: <CalendarDays className="w-5 h-5" /> },
-    { label: 'Upcoming',      value: todayAppointments.filter(a => new Date(a.start_time) > new Date()).length,   color: '#4F9CF9', icon: <Clock className="w-5 h-5" /> },
-    { label: 'Completed',     value: todayAppointments.filter(a => a.status === 'COMPLETED').length,              color: '#10B981', icon: <CheckCircle className="w-5 h-5" /> },
-    { label: 'Cancelled',     value: todayAppointments.filter(a => a.status === 'CANCELLED').length,              color: '#EF4444', icon: <Users className="w-5 h-5" /> },
+    { label: "Today's Total", value: todayAppointments.filter(a => a.status !== 'CANCELLED').length,                               color: '#C9A84C', icon: <CalendarDays className="w-5 h-5" /> },
+    { label: 'Pending',       value: todayAppointments.filter(a => ['SCHEDULED', 'WAITING', 'IN_SESSION'].includes(a.status)).length, color: '#4F9CF9', icon: <Clock className="w-5 h-5" /> },
+    { label: 'Completed',     value: todayAppointments.filter(a => a.status === 'COMPLETED').length,                                  color: '#10B981', icon: <CheckCircle className="w-5 h-5" /> },
+    { label: 'Cancelled',     value: todayAppointments.filter(a => a.status === 'CANCELLED').length,                                  color: '#EF4444', icon: <Users className="w-5 h-5" /> },
   ];
 
   return (
