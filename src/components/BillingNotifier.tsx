@@ -8,9 +8,11 @@ import { Receipt, AlertTriangle, CheckCircle, Wallet } from 'lucide-react';
 
 function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | number }) {
   const pt = visit.patient;
-  const total = visit.total_cost || 0;
+  const visitCost = visit.total_cost || 0;
+  const previousBalance = visit.previous_balance || 0;
+  const grandTotal = visitCost + previousBalance;
   const paid = visit.amount_paid || 0;
-  const remaining = total - paid;
+  const remaining = grandTotal - paid;
   
   const [payment, setPayment] = useState(remaining > 0 ? remaining : 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,15 +49,27 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-        <div className="p-2.5 rounded-xl text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-[10px] uppercase tracking-widest text-[#8A8A9A] mb-1">Total Cost</p>
-          <p className="font-black text-[#E8E8F0]">{total} EGP</p>
+      <div className="bg-black/20 rounded-xl p-3 border border-white/5 space-y-2 text-sm mb-4">
+        {previousBalance > 0 && (
+          <div className="flex justify-between text-[#EF4444] font-medium">
+            <span>Previous Balance</span>
+            <span>{previousBalance.toFixed(2)} EGP</span>
+          </div>
+        )}
+        <div className="flex justify-between text-[#8A8A9A]">
+          <span>Today's Visit</span>
+          <span>{visitCost.toFixed(2)} EGP</span>
         </div>
-        <div className="p-2.5 rounded-xl text-center" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
-          <p className="text-[10px] uppercase tracking-widest text-[#10B981] mb-1">Already Paid</p>
-          <p className="font-black text-[#10B981]">{paid} EGP</p>
+        <div className="border-t border-white/10 my-1 pt-2 flex justify-between font-black text-[#E8E8F0]">
+          <span>Grand Total</span>
+          <span>{grandTotal.toFixed(2)} EGP</span>
         </div>
+        {paid > 0 && (
+          <div className="flex justify-between text-[#10B981] font-bold">
+            <span>Already Paid</span>
+            <span>-{paid.toFixed(2)} EGP</span>
+          </div>
+        )}
       </div>
       
       <div className={`p-3 rounded-xl border flex items-center justify-between mb-4 ${
@@ -67,7 +81,7 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
           {remaining > 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
           To Be Collected
         </span>
-        <span className="font-black text-lg">{remaining > 0 ? remaining : 0} EGP</span>
+        <span className="font-black text-lg">{remaining > 0 ? remaining.toFixed(2) : '0.00'} EGP</span>
       </div>
 
       {remaining > 0 ? (
