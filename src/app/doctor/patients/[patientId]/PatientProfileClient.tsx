@@ -342,7 +342,7 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [visitCost, setVisitCost] = useState(0);
   const [amountPaidNow, setAmountPaidNow] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
   // Calculate total outstanding balance across ALL visits
@@ -389,7 +389,11 @@ export default function PatientProfileClient({ patient, visits, doctors, service
     setShowVisitForm(true);
     setVisitCost(visit.total_cost || 0);
     setAmountPaidNow(visit.amount_paid || 0);
-    setSelectedServiceId('');
+    
+    const names = visit.procedure_performed?.split(', ') || [];
+    const matchedIds = names.map(n => services.find(s => s.name === n)?.id).filter(Boolean) as string[];
+    setSelectedServiceIds(matchedIds);
+    
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -505,31 +509,48 @@ export default function PatientProfileClient({ patient, visits, doctors, service
               </Field>
             </div>
 
-            <Field label="Procedure Performed">
-              <select
-                value={selectedServiceId}
-                onChange={e => {
-                  const svcId = e.target.value;
-                  setSelectedServiceId(svcId);
-                  const svc = services.find(s => s.id === svcId);
-                  if (svc?.price !== undefined) {
-                    setVisitCost(svc.price);
-                  }
-                }}
-                className="input-premium"
-              >
-                <option value="">— Select a procedure —</option>
-                {services.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}{s.price !== undefined ? ` · ${s.price.toFixed(0)} EGP` : ''}
-                  </option>
-                ))}
-              </select>
-              {/* Hidden field submits the service name (text) to the server action */}
+            <Field label="Procedure(s) Performed">
+              <div className="flex flex-wrap gap-2">
+                {services.map(s => {
+                  const isSelected = selectedServiceIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        let newIds;
+                        if (isSelected) {
+                          newIds = selectedServiceIds.filter(id => id !== s.id);
+                        } else {
+                          newIds = [...selectedServiceIds, s.id];
+                        }
+                        setSelectedServiceIds(newIds);
+                        // Auto-calculate total
+                        const newTotal = newIds.reduce((sum, id) => {
+                          const svc = services.find(srv => srv.id === id);
+                          return sum + (svc?.price || 0);
+                        }, 0);
+                        setVisitCost(newTotal);
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-sm transition-all font-medium"
+                      style={
+                        isSelected
+                          ? { background: 'rgba(201,168,76,0.15)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.4)' }
+                          : { background: 'rgba(255,255,255,0.03)', color: '#8A8A9A', border: '1px solid rgba(255,255,255,0.1)' }
+                      }
+                    >
+                      {s.name} {s.price !== undefined ? `· ${s.price} EGP` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Hidden field submits the comma-separated service names (text) to the server action */}
               <input
                 type="hidden"
                 name="procedure_performed"
-                value={services.find(s => s.id === selectedServiceId)?.name || editingVisit?.procedure_performed || ''}
+                value={selectedServiceIds.length > 0 
+                  ? selectedServiceIds.map(id => services.find(s => s.id === id)?.name).join(', ') 
+                  : editingVisit?.procedure_performed || ''}
               />
             </Field>
 
@@ -574,9 +595,9 @@ export default function PatientProfileClient({ patient, visits, doctors, service
                     className="input-premium"
                     onChange={e => setVisitCost(parseFloat(e.target.value) || 0)}
                   />
-                  {selectedServiceId && services.find(s => s.id === selectedServiceId)?.price !== undefined && (
+                  {selectedServiceIds.length > 0 && (
                     <p className="text-[10px] mt-1" style={{ color: '#C9A84C99' }}>
-                      Auto-filled from service price · you may override
+                      Auto-calculated from selected procedures · you may override
                     </p>
                   )}
                 </Field>
