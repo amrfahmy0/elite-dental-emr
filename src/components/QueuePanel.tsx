@@ -6,7 +6,7 @@ import {
   Clock, AlertTriangle, ChevronRight, CalendarDays,
   UserCheck, PlayCircle, CheckCircle2, XCircle, Wifi, WifiOff, Stethoscope
 } from 'lucide-react';
-import { updateAppointmentStatusAction } from '@/app/actions';
+import { updateAppointmentStatusAction, getAppointmentDetailsAction } from '@/app/actions';
 import { supabase } from '@/lib/supabase';
 
 type ApptStatus = 'SCHEDULED' | 'WAITING' | 'IN_SESSION' | 'COMPLETED' | 'CANCELLED';
@@ -96,12 +96,8 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
               );
             });
 
-            // 2. Async fetch the full relation data (patient, service, doctor)
-            const { data } = await supabase
-              .from('appointments')
-              .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
-              .eq('id', updated.id)
-              .single();
+            // 2. Async fetch the full relation data (patient, service, doctor) via Server Action to bypass RLS
+            const { data } = await getAppointmentDetailsAction(updated.id);
 
             if (data) {
               setQueue(prev => prev.map(a => a.id === data.id ? (data as QueueAppt) : a));
@@ -111,11 +107,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
           if (eventType === 'UPDATE') {
             // In case of an update where we don't have the relations loaded (e.g. moved from another day)
             // we will fetch the full data as well just to be safe.
-            const { data } = await supabase
-              .from('appointments')
-              .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
-              .eq('id', updated.id)
-              .single();
+            const { data } = await getAppointmentDetailsAction(updated.id);
 
             if (data) {
               setQueue(prev => {

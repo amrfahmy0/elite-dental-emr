@@ -92,6 +92,16 @@ export async function updateAppointmentStatusAction(id: string, status: string) 
   return { success: true };
 }
 
+export async function getAppointmentDetailsAction(id: string) {
+  const { data, error } = await supabaseAdmin
+    .from('appointments')
+    .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
+    .eq('id', id)
+    .single();
+  if (error) return { error: error.message };
+  return { data };
+}
+
 // ─── PATIENTS ──────────────────────────────────────────────────────────────
 
 export async function createPatientAction(formData: FormData) {
