@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useCallback } from 'react';
+import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import {
   Clock, AlertTriangle, ChevronRight, CalendarDays,
   UserCheck, PlayCircle, CheckCircle2, XCircle, Wifi, WifiOff, Stethoscope
@@ -44,13 +45,38 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
   const [connected, setConnected] = useState(false);
   const [, startTransition]       = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const prevQueueRef = useRef(initialQueue);
 
   // ── Sync server prop → local state whenever the server re-renders ─────────
   // This is the key: router.refresh() makes the server re-fetch with full joins
   // and sends new initialQueue down. This effect picks it up without a full reload.
   useEffect(() => {
+    // Diff to find newly inserted items and notify the Doctor
+    if (role === 'DOCTOR') {
+      const prevIds = new Set(prevQueueRef.current.map(a => a.id));
+      const newAppts = initialQueue.filter(a => !prevIds.has(a.id));
+      
+      newAppts.forEach(appt => {
+        // Play notification sound
+        try {
+          // A subtle modern UI ping sound
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+          audio.play().catch(() => {}); // Catch auto-play blocks
+        } catch (e) {}
+        
+        // Show toast
+        const time = new Date(appt.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const ptName = `${appt.patient?.first_name || 'Unknown'} ${appt.patient?.last_name || ''}`.trim();
+        toast.success(`New Appointment Added!`, {
+          description: `${ptName} at ${time}`,
+          duration: 5000,
+        });
+      });
+    }
+
+    prevQueueRef.current = initialQueue;
     setQueue(initialQueue);
-  }, [initialQueue]);
+  }, [initialQueue, role]);
 
   // ── Supabase Realtime subscription ────────────────────────────────────────
   // Pattern: Realtime fires → router.refresh() → server re-fetches with admin
