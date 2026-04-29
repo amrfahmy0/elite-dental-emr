@@ -17,11 +17,16 @@ export default async function DoctorCalendarPage() {
 
   const appointments = appts || [];
 
+  const cairoTodayString = new Date().toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
+  const todayAppointments = appointments.filter(a => 
+    new Date(a.start_time).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) === cairoTodayString
+  );
+
   const stats = [
-    { label: 'Total',      value: appointments.length,                                                    color: '#C9A84C', icon: <CalendarDays className="w-5 h-5" /> },
-    { label: 'Upcoming',   value: appointments.filter(a => new Date(a.start_time) > new Date()).length,   color: '#4F9CF9', icon: <Clock className="w-5 h-5" /> },
-    { label: 'Completed',  value: appointments.filter(a => a.status === 'COMPLETED').length,              color: '#10B981', icon: <CheckCircle className="w-5 h-5" /> },
-    { label: 'Cancelled',  value: appointments.filter(a => a.status === 'CANCELLED').length,              color: '#EF4444', icon: <Users className="w-5 h-5" /> },
+    { label: "Today's Total", value: todayAppointments.length,                                                    color: '#C9A84C', icon: <CalendarDays className="w-5 h-5" /> },
+    { label: 'Upcoming',      value: todayAppointments.filter(a => new Date(a.start_time) > new Date()).length,   color: '#4F9CF9', icon: <Clock className="w-5 h-5" /> },
+    { label: 'Completed',     value: todayAppointments.filter(a => a.status === 'COMPLETED').length,              color: '#10B981', icon: <CheckCircle className="w-5 h-5" /> },
+    { label: 'Cancelled',     value: todayAppointments.filter(a => a.status === 'CANCELLED').length,              color: '#EF4444', icon: <Users className="w-5 h-5" /> },
   ];
 
   return (
