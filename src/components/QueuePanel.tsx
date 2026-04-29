@@ -45,7 +45,9 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
   // ── Auto-refresh every 5 s ────────────────────────────────────────────────
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/queue-today' + (doctorId ? `?doctorId=${doctorId}` : ''), { cache: 'no-store' });
+      const ts = new Date().getTime();
+      const url = `/api/queue-today?t=${ts}` + (doctorId ? `&doctorId=${doctorId}` : '');
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) return;
       const data: QueueAppt[] = await res.json();
       setQueue(data);
