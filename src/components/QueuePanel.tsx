@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useTransition, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Clock, AlertTriangle, ChevronRight, CalendarDays,
   UserCheck, PlayCircle, CheckCircle2, XCircle, Wifi, WifiOff, Stethoscope
 } from 'lucide-react';
-import { updateAppointmentStatusAction, getAppointmentDetailsAction } from '@/app/actions';
+import { updateAppointmentStatusAction } from '@/app/actions';
 import { supabase } from '@/lib/supabase';
 
 type ApptStatus = 'SCHEDULED' | 'WAITING' | 'IN_SESSION' | 'COMPLETED' | 'CANCELLED';
@@ -38,92 +39,35 @@ const STATUS_META: Record<ApptStatus, { label: string; color: string; dot: strin
 };
 
 export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelProps) {
+  const router = useRouter();
   const [queue,     setQueue]     = useState<QueueAppt[]>(initialQueue);
   const [connected, setConnected] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition]       = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  // ── Supabase Realtime subscription ──────────────────────────────────────────
+  // ── Sync server prop → local state whenever the server re-renders ─────────
+  // This is the key: router.refresh() makes the server re-fetch with full joins
+  // and sends new initialQueue down. This effect picks it up without a full reload.
   useEffect(() => {
-    // Build a unique channel name so multiple panels don't collide
-    const channelName = `queue-panel-${role}-${doctorId ?? 'all'}`;
+    setQueue(initialQueue);
+  }, [initialQueue]);
+
+  // ── Supabase Realtime subscription ────────────────────────────────────────
+  // Pattern: Realtime fires → router.refresh() → server re-fetches with admin
+  // client (bypasses RLS) → full joined data arrives via initialQueue prop →
+  // useEffect above syncs it to local state. Clean and reliable.
+  useEffect(() => {
+    const channelName = `queue-rt-${role}-${doctorId ?? 'all'}`;
 
     const channel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
-        {
-          event: '*',           // INSERT | UPDATE | DELETE
-          schema: 'public',
-          table: 'appointments',
-        },
-        async (payload) => {
-          const { eventType, new: newRow, old: oldRow } = payload;
-
-          if (eventType === 'DELETE') {
-            setQueue(prev => prev.filter(a => a.id !== (oldRow as any).id));
-            return;
-          }
-
-          const updated = newRow as any;
-
-          // For the doctor panel, only track their own appointments
-          if (role === 'DOCTOR' && doctorId && updated.doctor_id !== doctorId) {
-            return;
-          }
-
-          // Check if the appointment belongs to today (local date)
-          const apptDate = new Date(updated.start_time);
-          const today    = new Date();
-          const isToday  =
-            apptDate.getFullYear() === today.getFullYear() &&
-            apptDate.getMonth()    === today.getMonth()    &&
-            apptDate.getDate()     === today.getDate();
-
-          if (!isToday) return; // ignore appointments on other days
-
-          if (eventType === 'INSERT') {
-            // 1. Instantly add a placeholder to the UI
-            setQueue(prev => {
-              if (prev.some(a => a.id === updated.id)) return prev;
-              const placeholder: QueueAppt = {
-                ...updated,
-                patient: { id: '', first_name: 'Loading...', last_name: '', patient_id: '...', has_bleeding_disorder: false },
-                service: { name: '...' },
-              };
-              return [...prev, placeholder].sort(
-                (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-              );
-            });
-
-            // 2. Async fetch the full relation data (patient, service, doctor) via Server Action to bypass RLS
-            const { data } = await getAppointmentDetailsAction(updated.id);
-
-            if (data) {
-              setQueue(prev => prev.map(a => a.id === data.id ? (data as QueueAppt) : a));
-            }
-          }
-
-          if (eventType === 'UPDATE') {
-            // In case of an update where we don't have the relations loaded (e.g. moved from another day)
-            // we will fetch the full data as well just to be safe.
-            const { data } = await getAppointmentDetailsAction(updated.id);
-
-            if (data) {
-              setQueue(prev => {
-                if (prev.some(a => a.id === data.id)) {
-                  return prev.map(a => a.id === data.id ? (data as QueueAppt) : a);
-                } else {
-                  return [...prev, data as QueueAppt].sort(
-                    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-                  );
-                }
-              });
-            } else {
-              // Fallback to just patching what we have
-              setQueue(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
-            }
-          }
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          // Just trigger a soft re-render of the server component.
+          // No inline async fetches — the server handles all data with supabaseAdmin.
+          router.refresh();
         }
       )
       .subscribe((status) => {
@@ -133,21 +77,21 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [role, doctorId]);
+  }, [role, doctorId, router]);
 
-  // ── Status change via server action ─────────────────────────────────────────
+  // ── Status change via server action ──────────────────────────────────────
   const changeStatus = useCallback((apptId: string, newStatus: ApptStatus) => {
     setLoadingId(apptId);
-    // Optimistic update immediately
+    // Optimistic update immediately in the UI
     setQueue(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a));
     startTransition(async () => {
       await updateAppointmentStatusAction(apptId, newStatus);
       setLoadingId(null);
-      // Realtime will confirm the final state from DB
+      // Realtime will call router.refresh() which confirms final state from DB
     });
   }, []);
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = {
     total:     queue.length,
     waiting:   queue.filter(a => a.status === 'WAITING').length,
