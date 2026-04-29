@@ -344,13 +344,10 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
-  // Calculate total outstanding balance across ALL visits
-  const totalOutstandingBalance = visits.reduce((sum, v) => {
-    const visitBalance = (v.total_cost || 0) + (v.previous_balance || 0) - (v.amount_paid || 0);
-    return sum + visitBalance;
-  }, 0);
-  // Only carry forward if positive (patient owes money)
-  const carryForwardBalance = Math.max(0, totalOutstandingBalance);
+  // Calculate total outstanding balance by looking at the most recent visit
+  const carryForwardBalance = visits.length > 0 
+    ? Math.max(0, (visits[0].total_cost || 0) + (visits[0].previous_balance || 0) - (visits[0].amount_paid || 0))
+    : 0;
 
   const handleVisitSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
