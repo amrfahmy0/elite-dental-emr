@@ -208,9 +208,9 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                 </div>
 
                 {/* Patient info */}
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: '#E8E8F0' }}>
+                <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <p className="font-semibold text-sm leading-tight" style={{ color: '#E8E8F0', wordBreak: 'break-word' }}>
                       {pt.first_name} {pt.last_name}
                     </p>
                     {pt.has_bleeding_disorder && (
@@ -221,7 +221,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                     )}
                   </div>
                   {appt.chief_complaint && (
-                    <p className="text-[11px] mt-0.5 truncate" style={{ color: '#A87E30' }}>"{appt.chief_complaint}"</p>
+                    <p className="text-[11px] mt-1 leading-snug" style={{ color: '#A87E30', wordBreak: 'break-word' }}>"{appt.chief_complaint}"</p>
                   )}
                 </div>
 
