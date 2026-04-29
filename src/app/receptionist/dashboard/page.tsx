@@ -12,23 +12,23 @@ export default async function ReceptionistDashboard() {
   const userId = cookieStore.get('user_id')?.value;
 
   // Fetch all data in parallel
-  const [apptsRes, servicesRes, patientsRes, doctorsRes, todayApptsRes] = await Promise.all([
+  const [apptsRes, servicesRes, patientsRes, doctorsRes] = await Promise.all([
     supabaseAdmin.from('appointments').select(`*, patient:patients(*), doctor:users(*), service:services(*)`).order('start_time', { ascending: true }),
     supabaseAdmin.from('services').select('*').order('duration_minutes', { ascending: true }),
     supabaseAdmin.from('patients').select('*').order('created_at', { ascending: false }),
     supabaseAdmin.from('users').select('*').eq('role', 'DOCTOR'),
-    supabaseAdmin.from('appointments')
-      .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
-      .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
-      .lte('start_time', new Date(new Date().setHours(23,59,59,999)).toISOString())
-      .order('start_time', { ascending: true }),
   ]);
 
   const appointments = apptsRes.data || [];
   const services = servicesRes.data || [];
   const patients = patientsRes.data || [];
   const doctors = doctorsRes.data || [];
-  const todayAppts = todayApptsRes.data || [];
+
+  const now = new Date();
+  const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
+  const todayAppts = appointments.filter(a => 
+    new Date(a.start_time).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) === cairoTodayString
+  );
 
   const stats = [
     { label: "Today's Total", value: todayAppts.length, icon: <CalendarDays className="w-5 h-5" />, color: '#4F9CF9' },
@@ -45,7 +45,7 @@ export default async function ReceptionistDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gold-gradient">Front Desk</h1>
           <p className="text-sm mt-0.5" style={{ color: '#6A6A7A' }}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            {now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
         <Link href="/receptionist/patients/new"

@@ -15,15 +15,23 @@ export default async function DoctorDashboard() {
       .from('appointments')
       .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
       .eq('doctor_id', doctorId!)
-      .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
-      .lte('start_time', new Date(new Date().setHours(23,59,59,999)).toISOString())
+      .gte('start_time', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+      .lte('start_time', new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
       .order('start_time', { ascending: true }),
   ]);
 
   const doctor = doctorRes.data;
-  const queue  = apptsRes.data || [];
+  const rawQueue = apptsRes.data || [];
+  
   const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
+  const queue = rawQueue.filter(a => 
+    new Date(a.start_time).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) === cairoTodayString
+  );
+
+  const greeting = now.toLocaleTimeString('en-US', { timeZone: 'Africa/Cairo', hour12: false }).split(':')[0];
+  const greetingNum = parseInt(greeting);
+  const greetingText = greetingNum < 12 ? 'Good morning' : greetingNum < 17 ? 'Good afternoon' : 'Good evening';
 
   const stats = [
     { label: 'Today',      value: queue.length,                                                               color: '#C9A84C' },
@@ -41,11 +49,11 @@ export default async function DoctorDashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-5"
           style={{ background: 'radial-gradient(circle, #C9A84C, transparent)', transform: 'translate(30%, -30%)' }} />
         <div className="relative z-10">
-          <p className="text-sm mb-1" style={{ color: '#8A8A9A' }}>{greeting},</p>
+          <p className="text-sm mb-1" style={{ color: '#8A8A9A' }}>{greetingText},</p>
           <h1 className="text-3xl font-bold text-gold-gradient mb-1">Dr. {doctor?.full_name || 'Doctor'}</h1>
           <p className="text-sm flex items-center gap-2" style={{ color: '#6A6A7A' }}>
             <CalendarDays className="w-4 h-4" />
-            {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            {now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
           <div className="flex gap-6 mt-5">
             {stats.map(s => (
