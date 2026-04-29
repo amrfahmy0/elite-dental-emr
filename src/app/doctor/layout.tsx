@@ -19,7 +19,7 @@ export default async function DoctorLayout({ children }: { children: React.React
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar role="DOCTOR" userName={user?.full_name || 'Doctor'} />
-      <main className="flex-1 lg:ml-64 overflow-y-auto" style={{ background: '#0B1220' }}>
+      <main className="flex-1 lg:ml-20 overflow-y-auto transition-all duration-300" style={{ background: '#0B1220' }}>
         <div className="p-4 sm:p-8 pt-20 lg:pt-8 min-h-screen">
           {children}
         </div>
