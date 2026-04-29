@@ -4,9 +4,10 @@ import React, { useState, useEffect, useTransition, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Clock, AlertTriangle, ChevronRight, CalendarDays,
-  UserCheck, PlayCircle, CheckCircle2, XCircle, RefreshCw, Stethoscope
+  UserCheck, PlayCircle, CheckCircle2, XCircle, Wifi, WifiOff, Stethoscope
 } from 'lucide-react';
 import { updateAppointmentStatusAction } from '@/app/actions';
+import { supabase } from '@/lib/supabase';
 
 type ApptStatus = 'SCHEDULED' | 'WAITING' | 'IN_SESSION' | 'COMPLETED' | 'CANCELLED';
 
@@ -16,6 +17,7 @@ interface QueueAppt {
   end_time: string;
   status: ApptStatus;
   chief_complaint?: string;
+  doctor_id?: string;
   patient: { id: string; first_name: string; last_name: string; patient_id: string; has_bleeding_disorder: boolean };
   service?: { name: string };
   doctor?: { full_name: string };
@@ -24,7 +26,6 @@ interface QueueAppt {
 interface QueuePanelProps {
   initialQueue: QueueAppt[];
   role: 'DOCTOR' | 'RECEPTIONIST';
-  /** Doctor ID — receptionist shows all, doctor shows only theirs */
   doctorId?: string;
 }
 
@@ -37,51 +38,102 @@ const STATUS_META: Record<ApptStatus, { label: string; color: string; dot: strin
 };
 
 export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelProps) {
-  const [queue, setQueue] = useState<QueueAppt[]>(initialQueue);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [queue,     setQueue]     = useState<QueueAppt[]>(initialQueue);
+  const [connected, setConnected] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  // ── Auto-refresh every 5 s ────────────────────────────────────────────────
-  const refresh = useCallback(async () => {
-    try {
-      const ts = new Date().getTime();
-      const url = `/api/queue-today?t=${ts}` + (doctorId ? `&doctorId=${doctorId}` : '');
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data: QueueAppt[] = await res.json();
-      setQueue(data);
-      setLastRefresh(new Date());
-    } catch { /* silent */ }
-  }, [doctorId]);
-
+  // ── Supabase Realtime subscription ──────────────────────────────────────────
   useEffect(() => {
-    const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    // Build a unique channel name so multiple panels don't collide
+    const channelName = `queue-panel-${role}-${doctorId ?? 'all'}`;
 
-  // ── Status change ─────────────────────────────────────────────────────────
-  const changeStatus = (apptId: string, newStatus: ApptStatus) => {
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',           // INSERT | UPDATE | DELETE
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload;
+
+          setQueue(prev => {
+            if (eventType === 'DELETE') {
+              return prev.filter(a => a.id !== (oldRow as any).id);
+            }
+
+            const updated = newRow as any;
+
+            // For the doctor panel, only track their own appointments
+            if (role === 'DOCTOR' && doctorId && updated.doctor_id !== doctorId) {
+              return prev;
+            }
+
+            // Check if the appointment belongs to today (local date)
+            const apptDate = new Date(updated.start_time);
+            const today    = new Date();
+            const isToday  =
+              apptDate.getFullYear() === today.getFullYear() &&
+              apptDate.getMonth()    === today.getMonth()    &&
+              apptDate.getDate()     === today.getDate();
+
+            if (!isToday) return prev; // ignore appointments on other days
+
+            if (eventType === 'INSERT') {
+              // Avoid duplicates (initial data might already include it)
+              if (prev.some(a => a.id === updated.id)) return prev;
+              // We only have the raw row here – attach a placeholder for joined data
+              const enriched: QueueAppt = {
+                ...updated,
+                patient: updated.patient ?? { id: '', first_name: '—', last_name: '', patient_id: '', has_bleeding_disorder: false },
+                service: updated.service ?? undefined,
+                doctor:  updated.doctor  ?? undefined,
+              };
+              return [...prev, enriched].sort(
+                (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+              );
+            }
+
+            if (eventType === 'UPDATE') {
+              return prev.map(a =>
+                a.id === updated.id ? { ...a, ...updated } : a
+              );
+            }
+
+            return prev;
+          });
+        }
+      )
+      .subscribe((status) => {
+        setConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [role, doctorId]);
+
+  // ── Status change via server action ─────────────────────────────────────────
+  const changeStatus = useCallback((apptId: string, newStatus: ApptStatus) => {
     setLoadingId(apptId);
+    // Optimistic update immediately
+    setQueue(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a));
     startTransition(async () => {
       await updateAppointmentStatusAction(apptId, newStatus);
-      // Optimistic update
-      setQueue(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a));
       setLoadingId(null);
+      // Realtime will confirm the final state from DB
     });
-  };
+  }, []);
 
-  // ── Filter: doctor sees only their own ───────────────────────────────────
-  const visible = queue.filter(a => {
-    if (role === 'DOCTOR' && doctorId) return true; // already filtered server-side
-    return true;
-  });
-
+  // ── Stats ────────────────────────────────────────────────────────────────────
   const stats = {
-    total:    visible.length,
-    waiting:  visible.filter(a => a.status === 'WAITING').length,
-    inSession:visible.filter(a => a.status === 'IN_SESSION').length,
-    done:     visible.filter(a => a.status === 'COMPLETED').length,
+    total:     queue.length,
+    waiting:   queue.filter(a => a.status === 'WAITING').length,
+    inSession: queue.filter(a => a.status === 'IN_SESSION').length,
+    done:      queue.filter(a => a.status === 'COMPLETED').length,
   };
 
   return (
@@ -92,13 +144,19 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
         <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#E8E8F0' }}>
           <Clock className="w-5 h-5" style={{ color: '#C9A84C' }} />
           Today's Queue
-          <span className="text-sm font-normal ml-1" style={{ color: '#5A5A6A' }}>({visible.length} patients)</span>
+          <span className="text-sm font-normal ml-1" style={{ color: '#5A5A6A' }}>
+            ({queue.length} patients)
+          </span>
         </h2>
-        <button onClick={refresh} title="Refresh"
-          className="p-1.5 rounded-lg transition-all hover:scale-110"
-          style={{ color: '#5A5A6A' }}>
-          <RefreshCw className="w-4 h-4" />
-        </button>
+
+        {/* Realtime connection indicator */}
+        <div className="flex items-center gap-1.5 text-xs font-medium"
+          style={{ color: connected ? '#10B981' : '#F59E0B' }}
+          title={connected ? 'Live – receiving real-time updates' : 'Connecting…'}>
+          {connected
+            ? <><Wifi className="w-3.5 h-3.5" /> Live</>
+            : <><WifiOff className="w-3.5 h-3.5" /> Connecting…</>}
+        </div>
       </div>
 
       {/* Mini stats strip */}
@@ -119,16 +177,17 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
 
       {/* Queue list */}
       <div className="space-y-2">
-        {visible.length === 0 && (
-          <div className="text-center py-10 rounded-2xl" style={{ background: 'rgba(15,27,46,0.5)', border: '1px solid rgba(201,168,76,0.06)' }}>
+        {queue.length === 0 && (
+          <div className="text-center py-10 rounded-2xl"
+            style={{ background: 'rgba(15,27,46,0.5)', border: '1px solid rgba(201,168,76,0.06)' }}>
             <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-20" />
             <p className="text-sm" style={{ color: '#5A5A6A' }}>No appointments scheduled for today.</p>
           </div>
         )}
 
-        {visible.map(appt => {
-          const pt = appt.patient;
-          const meta = STATUS_META[appt.status] || STATUS_META.SCHEDULED;
+        {queue.map(appt => {
+          const pt        = appt.patient;
+          const meta      = STATUS_META[appt.status] ?? STATUS_META.SCHEDULED;
           const isLoading = loadingId === appt.id;
           const startTime = new Date(appt.start_time);
 
@@ -137,8 +196,9 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
               className="rounded-2xl overflow-hidden transition-all"
               style={{ background: 'rgba(15,27,46,0.7)', border: `1px solid ${meta.color}25` }}>
 
-              {/* Status bar */}
-              <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${meta.color}, transparent)` }} />
+              {/* Coloured top bar */}
+              <div className="h-0.5 w-full"
+                style={{ background: `linear-gradient(90deg, ${meta.color}, transparent)` }} />
 
               <div className="flex items-center gap-3 px-4 py-3">
                 {/* Time */}
@@ -180,7 +240,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                   {meta.dot} {meta.label}
                 </span>
 
-                {/* Action buttons — RECEPTIONIST */}
+                {/* ── RECEPTIONIST actions ── */}
                 {role === 'RECEPTIONIST' && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     {appt.status === 'SCHEDULED' && (
@@ -201,7 +261,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                         <XCircle className="w-4 h-4" />
                       </ActionBtn>
                     )}
-                    <Link href={`/receptionist/patients`}
+                    <Link href="/receptionist/patients"
                       className="p-1.5 rounded-lg transition-all hover:scale-110"
                       style={{ color: '#5A5A6A' }} title="View Patient">
                       <ChevronRight className="w-4 h-4" />
@@ -209,7 +269,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                   </div>
                 )}
 
-                {/* Action buttons — DOCTOR */}
+                {/* ── DOCTOR actions ── */}
                 {role === 'DOCTOR' && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     {appt.status === 'WAITING' && (
@@ -239,9 +299,11 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
         })}
       </div>
 
-      {/* Last refresh indicator */}
+      {/* Realtime status footer */}
       <p className="text-[10px] text-right" style={{ color: '#3A3A4A' }}>
-        Auto-refreshes every 5 s · Last: {lastRefresh.toLocaleTimeString()}
+        {connected
+          ? '⚡ Real-time sync active via WebSocket'
+          : '⏳ Establishing WebSocket connection…'}
       </p>
     </div>
   );
