@@ -22,8 +22,9 @@ interface SidebarProps {
 }
 
 const doctorNav: NavItem[] = [
-  { label: 'Dashboard', href: '/doctor/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { label: 'My Patients', href: '/doctor/patients', icon: <Users className="w-5 h-5" /> },
+  { label: 'Dashboard',   href: '/doctor/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { label: 'My Schedule', href: '/doctor/calendar',  icon: <CalendarDays className="w-5 h-5" /> },
+  { label: 'My Patients', href: '/doctor/patients',  icon: <Users className="w-5 h-5" /> },
 ];
 
 const receptionistNav: NavItem[] = [
