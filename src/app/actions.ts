@@ -200,6 +200,15 @@ export async function createVisitAction(formData: FormData, patientId: string, d
   return { visit };
 }
 
+export async function getVisitDetailsAction(visitId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('visits')
+    .select('*, patient:patients(*), doctor:users(*)')
+    .eq('id', visitId)
+    .single();
+  return { data, error: error?.message };
+}
+
 export async function deleteVisitAction(visitId: string, patientId: string) {
   const { error } = await supabaseAdmin.from('visits').delete().eq('id', visitId);
   if (error) return { error: error.message };
