@@ -1,39 +1,27 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
-import { updateAppointmentStatusAction } from '@/app/actions';
-import Link from 'next/link';
-import { Clock, ChevronRight, AlertTriangle, CalendarDays, CheckCircle2 } from 'lucide-react';
+import QueuePanel from '@/components/QueuePanel';
+import { CalendarDays } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
-export const revalidate = 0;
-
-
-async function completeSession(formData: FormData) {
-  'use server';
-  const id = formData.get('id') as string;
-  await updateAppointmentStatusAction(id, 'COMPLETED');
-}
 
 export default async function DoctorDashboard() {
   const cookieStore = await cookies();
   const doctorId = cookieStore.get('user_id')?.value;
 
-  const { data: doctor } = await supabaseAdmin
-    .from('users').select('*').eq('id', doctorId!).single();
+  const [doctorRes, apptsRes] = await Promise.all([
+    supabaseAdmin.from('users').select('*').eq('id', doctorId!).single(),
+    supabaseAdmin
+      .from('appointments')
+      .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
+      .eq('doctor_id', doctorId!)
+      .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
+      .lte('start_time', new Date(new Date().setHours(23,59,59,999)).toISOString())
+      .order('start_time', { ascending: true }),
+  ]);
 
-  const todayStart = new Date(new Date().setHours(0,0,0,0)).toISOString();
-  const todayEnd   = new Date(new Date().setHours(23,59,59,999)).toISOString();
-
-  const { data: appts } = await supabaseAdmin
-    .from('appointments')
-    .select(`*, patient:patients(*), service:services(*)`)
-    .eq('doctor_id', doctorId!)
-    .gte('start_time', todayStart)
-    .lte('start_time', todayEnd)
-    .order('start_time', { ascending: true });
-
-  const queue = appts || [];
+  const doctor = doctorRes.data;
+  const queue  = apptsRes.data || [];
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -43,9 +31,6 @@ export default async function DoctorDashboard() {
     { label: 'In Session', value: queue.filter(a => a.status === 'IN_SESSION').length,                        color: '#10B981' },
     { label: 'Remaining',  value: queue.filter(a => !['COMPLETED','CANCELLED'].includes(a.status)).length,    color: '#4F9CF9' },
   ];
-
-  const sc = (s: string) =>
-    s === 'IN_SESSION' ? '#10B981' : s === 'WAITING' ? '#F59E0B' : s === 'COMPLETED' ? '#6A6A7A' : s === 'CANCELLED' ? '#EF4444' : '#C9A84C';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -73,8 +58,14 @@ export default async function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Live Queue Panel */}
+      {/*
+        QueuePanel is a client component that:
+        - Renders the initial data immediately (no flicker)
+        - Polls /api/queue-today?doctorId=... every 5 s in the background
+        - Allows the doctor to click "Complete" via the server action in QueuePanel
+      */}
       <QueuePanel initialQueue={queue as any} role="DOCTOR" doctorId={doctorId} />
+
     </div>
   );
 }
