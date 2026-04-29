@@ -209,6 +209,19 @@ export async function getVisitDetailsAction(visitId: string) {
   return { data, error: error?.message };
 }
 
+export async function updateVisitPaymentAction(visitId: string, addedPayment: number) {
+  const { data: visit, error: fetchError } = await supabaseAdmin.from('visits').select('amount_paid, patient_id').eq('id', visitId).single();
+  if (fetchError) return { error: fetchError.message };
+  
+  const newAmount = (visit.amount_paid || 0) + addedPayment;
+  const { error } = await supabaseAdmin.from('visits').update({ amount_paid: newAmount }).eq('id', visitId);
+  if (error) return { error: error.message };
+  
+  revalidatePath(`/doctor/patients/${visit.patient_id}`);
+  revalidatePath(`/receptionist/patients/${visit.patient_id}`);
+  return { success: true };
+}
+
 export async function deleteVisitAction(visitId: string, patientId: string) {
   const { error } = await supabaseAdmin.from('visits').delete().eq('id', visitId);
   if (error) return { error: error.message };

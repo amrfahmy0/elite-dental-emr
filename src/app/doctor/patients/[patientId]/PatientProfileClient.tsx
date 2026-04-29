@@ -340,7 +340,6 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
   const [formError, setFormError] = useState('');
   const [visitCost, setVisitCost] = useState(0);
-  const [amountPaidNow, setAmountPaidNow] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
@@ -388,7 +387,6 @@ export default function PatientProfileClient({ patient, visits, doctors, service
     setEditingVisit(visit);
     setShowVisitForm(true);
     setVisitCost(visit.total_cost || 0);
-    setAmountPaidNow(visit.amount_paid || 0);
     
     const names = visit.procedure_performed?.split(', ') || [];
     const matchedIds = names.map(n => services.find(s => s.name === n)?.id).filter(Boolean) as string[];
@@ -601,30 +599,21 @@ export default function PatientProfileClient({ patient, visits, doctors, service
                     </p>
                   )}
                 </Field>
-                <Field label="Amount Paid Today (EGP)">
-                  <input
-                    name="amount_paid"
-                    defaultValue={editingVisit?.amount_paid || ''}
-                    type="number" step="0.01" min="0" placeholder="0.00"
-                    className="input-premium"
-                    onChange={e => setAmountPaidNow(parseFloat(e.target.value) || 0)}
-                  />
-                </Field>
+                <input type="hidden" name="amount_paid" value={editingVisit ? editingVisit.amount_paid || 0 : 0} />
               </div>
 
               {/* Live Billing Summary */}
               {!editingVisit && (() => {
                 const grandTotal = carryForwardBalance + visitCost;
-                const remaining = grandTotal - amountPaidNow;
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)' }}>
                       <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#C9A84C' }}>Grand Total</p>
                       <p className="text-xl font-black" style={{ color: '#C9A84C' }}>{grandTotal.toFixed(2)} EGP</p>
                     </div>
-                    <div className="rounded-xl px-4 py-3 text-center" style={{ background: remaining > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${remaining > 0 ? 'rgba(220,38,38,0.25)' : 'rgba(16,185,129,0.25)'}` }}>
-                      <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: remaining > 0 ? '#EF4444' : '#10B981' }}>Remaining Balance</p>
-                      <p className="text-xl font-black" style={{ color: remaining > 0 ? '#EF4444' : '#10B981' }}>{remaining.toFixed(2)} EGP</p>
+                    <div className="rounded-xl px-4 py-3 text-center" style={{ background: grandTotal > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${grandTotal > 0 ? 'rgba(220,38,38,0.25)' : 'rgba(16,185,129,0.25)'}` }}>
+                      <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: grandTotal > 0 ? '#EF4444' : '#10B981' }}>Sent to Front Desk</p>
+                      <p className="text-xl font-black" style={{ color: grandTotal > 0 ? '#EF4444' : '#10B981' }}>{grandTotal.toFixed(2)} EGP</p>
                     </div>
                   </div>
                 );
