@@ -31,7 +31,7 @@ export default async function DoctorCalendarPage() {
       <div>
         <h1 className="text-2xl font-bold text-gold-gradient">My Schedule</h1>
         <p className="text-sm mt-0.5" style={{ color: '#6A6A7A' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          {new Date().toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
 
@@ -52,7 +52,7 @@ export default async function DoctorCalendarPage() {
 
       {/* Calendar */}
       <div className="flex-1 min-h-0">
-        <DoctorCalendar appointments={appointments as any} />
+        <DoctorCalendar appointments={appointments.filter(a => a.status !== 'CANCELLED') as any} />
       </div>
     </div>
   );
