@@ -30,6 +30,7 @@ export interface Service {
   duration_minutes: number;
   color: string;
   description?: string;
+  price?: number;
 }
 
 export interface Appointment {

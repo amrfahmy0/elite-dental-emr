@@ -342,6 +342,7 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [visitCost, setVisitCost] = useState(0);
   const [amountPaidNow, setAmountPaidNow] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState('');
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
   // Calculate total outstanding balance across ALL visits
@@ -386,6 +387,9 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const openEditForm = (visit: Visit) => {
     setEditingVisit(visit);
     setShowVisitForm(true);
+    setVisitCost(visit.total_cost || 0);
+    setAmountPaidNow(visit.amount_paid || 0);
+    setSelectedServiceId('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -502,7 +506,31 @@ export default function PatientProfileClient({ patient, visits, doctors, service
             </div>
 
             <Field label="Procedure Performed">
-              <input name="procedure_performed" defaultValue={editingVisit?.procedure_performed || ''} placeholder="e.g. Amalgam Filling, RCT" className="input-premium" />
+              <select
+                value={selectedServiceId}
+                onChange={e => {
+                  const svcId = e.target.value;
+                  setSelectedServiceId(svcId);
+                  const svc = services.find(s => s.id === svcId);
+                  if (svc?.price !== undefined) {
+                    setVisitCost(svc.price);
+                  }
+                }}
+                className="input-premium"
+              >
+                <option value="">— Select a procedure —</option>
+                {services.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.price !== undefined ? ` · ${s.price.toFixed(0)} EGP` : ''}
+                  </option>
+                ))}
+              </select>
+              {/* Hidden field submits the service name (text) to the server action */}
+              <input
+                type="hidden"
+                name="procedure_performed"
+                value={services.find(s => s.id === selectedServiceId)?.name || editingVisit?.procedure_performed || ''}
+              />
             </Field>
 
             <Field label="Clinical Notes">
@@ -541,11 +569,16 @@ export default function PatientProfileClient({ patient, visits, doctors, service
                 <Field label="This Visit Cost (EGP)">
                   <input
                     name="total_cost"
-                    defaultValue={editingVisit?.total_cost || ''}
+                    value={visitCost || ''}
                     type="number" step="0.01" min="0" placeholder="0.00"
                     className="input-premium"
                     onChange={e => setVisitCost(parseFloat(e.target.value) || 0)}
                   />
+                  {selectedServiceId && services.find(s => s.id === selectedServiceId)?.price !== undefined && (
+                    <p className="text-[10px] mt-1" style={{ color: '#C9A84C99' }}>
+                      Auto-filled from service price · you may override
+                    </p>
+                  )}
                 </Field>
                 <Field label="Amount Paid Today (EGP)">
                   <input
