@@ -7,8 +7,8 @@ import { X, ChevronLeft, ChevronRight, Clock, User, Stethoscope, AlertCircle } f
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const HOUR_HEIGHT = 80; // px per hour
-const DAY_START = 8;    // 8 AM
-const DAY_END = 20;     // 8 PM
+const DAY_START = 10;   // 10 AM (earliest Monday shift)
+const DAY_END = 24;     // 12 AM (midnight)
 const TOTAL_HOURS = DAY_END - DAY_START;
 
 const SERVICE_COLORS: Record<string, string> = {
@@ -193,6 +193,22 @@ export default function InteractiveCalendar({
     startTime.setHours(DAY_START + Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
     const endTime = new Date(startTime.getTime() + selectedService.duration_minutes * 60000);
 
+    const dayOfWeek = day.getDay();
+    // Thursday (4) and Friday (5) are closed
+    if (dayOfWeek === 4 || dayOfWeek === 5) return true;
+
+    // Check working hours bounds
+    const startMinOfDay = startTime.getHours() * 60 + startTime.getMinutes();
+    const endMinOfDay = (endTime.getDate() !== startTime.getDate()) 
+      ? 24 * 60 + endTime.getHours() * 60 + endTime.getMinutes() 
+      : endTime.getHours() * 60 + endTime.getMinutes();
+
+    if (dayOfWeek === 1) { // Monday 10am to 4pm
+      if (startMinOfDay < 10 * 60 || endMinOfDay > 16 * 60) return true;
+    } else { // Saturday to Wednesday (except Mon) 6pm to 12am
+      if (startMinOfDay < 18 * 60 || endMinOfDay > 24 * 60) return true;
+    }
+
     return getApptsForDay(day).some(a => {
       const aStart = new Date(a.start_time).getTime();
       const aEnd = new Date(a.end_time).getTime();
@@ -339,7 +355,7 @@ export default function InteractiveCalendar({
                 style={{ top: i * HOUR_HEIGHT, height: HOUR_HEIGHT }}>
                 <span className="text-[11px] -mt-2.5" style={{ color: '#3A3A4A' }}>
                   {String((DAY_START + i) % 12 || 12).padStart(2, '0')}
-                  <span className="ml-0.5">{DAY_START + i < 12 ? 'AM' : 'PM'}</span>
+                  <span className="ml-0.5">{((DAY_START + i) >= 12 && (DAY_START + i) < 24) ? 'PM' : 'AM'}</span>
                 </span>
               </div>
             ))}
@@ -348,22 +364,26 @@ export default function InteractiveCalendar({
           {/* Day columns */}
           {displayDays.map((day, colIdx) => {
             const dayAppts = getApptsForDay(day);
+            const dayOfWeek = day.getDay();
+            const isClosedDay = dayOfWeek === 4 || dayOfWeek === 5;
+            
             return (
               <div key={colIdx} className="flex-1 relative cal-slot-col"
                 style={{
                   height: HOUR_HEIGHT * TOTAL_HOURS,
                   borderLeft: '1px solid rgba(201,168,76,0.06)',
-                  cursor: selectedService ? 'crosshair' : 'default',
+                  cursor: isClosedDay ? 'not-allowed' : (selectedService ? 'crosshair' : 'default'),
+                  background: isClosedDay ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.3) 10px, rgba(0,0,0,0.3) 20px)' : undefined,
                 }}
                 onMouseMove={(e) => {
-                  if (!selectedService) return;
+                  if (!selectedService || isClosedDay) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const y = e.clientY - rect.top;
                   handleMouseMove(e, colIdx);
                 }}
                 onMouseLeave={handleMouseLeave}
                 onClick={(e) => {
-                  if (!selectedService) return;
+                  if (!selectedService || isClosedDay) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const y = e.clientY - rect.top;
                   if (!isSlotOccupied(day, y)) {
@@ -372,13 +392,23 @@ export default function InteractiveCalendar({
                 }}
               >
                 {/* Hour lines */}
-                {Array.from({ length: TOTAL_HOURS }, (_, i) => (
-                  <div key={i} className="absolute w-full"
-                    style={{ top: i * HOUR_HEIGHT, height: HOUR_HEIGHT, borderTop: '1px solid rgba(201,168,76,0.06)' }}>
-                    {/* 30-min line */}
-                    <div className="absolute w-full" style={{ top: '50%', borderTop: '1px solid rgba(201,168,76,0.03)' }} />
-                  </div>
-                ))}
+                {Array.from({ length: TOTAL_HOURS }, (_, i) => {
+                  const hour24 = DAY_START + i;
+                  const isWorking = isClosedDay ? false : (dayOfWeek === 1 ? (hour24 >= 10 && hour24 < 16) : (hour24 >= 18 && hour24 < 24));
+
+                  return (
+                    <div key={i} className="absolute w-full"
+                      style={{ 
+                        top: i * HOUR_HEIGHT, 
+                        height: HOUR_HEIGHT, 
+                        borderTop: '1px solid rgba(201,168,76,0.06)',
+                        background: isWorking ? 'transparent' : 'rgba(0,0,0,0.4)',
+                      }}>
+                      {/* 30-min line */}
+                      <div className="absolute w-full" style={{ top: '50%', borderTop: '1px solid rgba(201,168,76,0.03)' }} />
+                    </div>
+                  );
+                })}
 
                 {/* Current time indicator */}
                 {day.toDateString() === today.toDateString() && (() => {
