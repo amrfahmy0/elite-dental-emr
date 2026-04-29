@@ -109,7 +109,10 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
   const changeStatus = useCallback((apptId: string, newStatus: ApptStatus) => {
     setLoadingId(apptId);
     // Optimistic update immediately in the UI
-    setQueue(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a));
+    setQueue(prev => {
+      if (newStatus === 'CANCELLED') return prev.filter(a => a.id !== apptId);
+      return prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a);
+    });
     startTransition(async () => {
       await updateAppointmentStatusAction(apptId, newStatus);
       setLoadingId(null);

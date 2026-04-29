@@ -19,7 +19,7 @@ export default async function ReceptionistDashboard() {
     supabaseAdmin.from('users').select('*').eq('role', 'DOCTOR'),
   ]);
 
-  const appointments = apptsRes.data || [];
+  const appointments = (apptsRes.data || []).filter(a => a.status !== 'CANCELLED');
   const services = servicesRes.data || [];
   const patients = patientsRes.data || [];
   const doctors = doctorsRes.data || [];

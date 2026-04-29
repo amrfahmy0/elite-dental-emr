@@ -21,7 +21,7 @@ export default async function DoctorDashboard() {
   ]);
 
   const doctor = doctorRes.data;
-  const rawQueue = apptsRes.data || [];
+  const rawQueue = (apptsRes.data || []).filter(a => a.status !== 'CANCELLED');
   
   const now = new Date();
   const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
