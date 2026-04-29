@@ -12,14 +12,14 @@ const DAY_END = 24;     // 12 AM (midnight)
 const TOTAL_HOURS = DAY_END - DAY_START;
 
 const SERVICE_COLORS: Record<string, string> = {
-  'Consultation':  '#4F9CF9',
-  'Extraction':    '#E57373',
-  'Filling':       '#81C995',
-  'Scaling':       '#C9A84C',
-  'Root Canal':    '#BA68C8',
-  'Whitening':     '#4DD0E1',
-  'Crown':         '#FFB74D',
-  'default':       '#10B981',
+  'Consultation': '#4F9CF9',
+  'Extraction': '#E57373',
+  'Filling': '#81C995',
+  'Scaling': '#C9A84C',
+  'Root Canal': '#BA68C8',
+  'Whitening': '#4DD0E1',
+  'Crown': '#FFB74D',
+  'default': '#10B981',
 };
 
 function getServiceColor(name: string) {
@@ -92,11 +92,10 @@ function AppointmentBlock({ appt, dayStart }: { appt: Appointment; dayStart: num
           {appt.service?.name} · {start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
         </p>
       )}
-      <span className={`text-[10px] font-bold uppercase absolute top-1 right-1.5 ${
-        appt.status === 'IN_SESSION' ? 'text-emerald-400' :
+      <span className={`text-[10px] font-bold uppercase absolute top-1 right-1.5 ${appt.status === 'IN_SESSION' ? 'text-emerald-400' :
         appt.status === 'WAITING' ? 'text-amber-400' :
-        appt.status === 'COMPLETED' ? 'text-slate-400' : 'opacity-0'
-      }`}>
+          appt.status === 'COMPLETED' ? 'text-slate-400' : 'opacity-0'
+        }`}>
         {appt.status === 'IN_SESSION' ? '●' : appt.status === 'WAITING' ? '◐' : ''}
       </span>
     </div>
@@ -194,17 +193,19 @@ export default function InteractiveCalendar({
     const endTime = new Date(startTime.getTime() + selectedService.duration_minutes * 60000);
 
     const dayOfWeek = day.getDay();
-    // Thursday (4) and Friday (5) are closed
-    if (dayOfWeek === 4 || dayOfWeek === 5) return true;
+    // Friday (5) is closed
+    if (dayOfWeek === 5) return true;
 
     // Check working hours bounds
     const startMinOfDay = startTime.getHours() * 60 + startTime.getMinutes();
-    const endMinOfDay = (endTime.getDate() !== startTime.getDate()) 
-      ? 24 * 60 + endTime.getHours() * 60 + endTime.getMinutes() 
+    const endMinOfDay = (endTime.getDate() !== startTime.getDate())
+      ? 24 * 60 + endTime.getHours() * 60 + endTime.getMinutes()
       : endTime.getHours() * 60 + endTime.getMinutes();
 
     if (dayOfWeek === 1) { // Monday 10am to 4pm
       if (startMinOfDay < 10 * 60 || endMinOfDay > 16 * 60) return true;
+    } else if (dayOfWeek === 4) { // Thursday 12pm to 10pm
+      if (startMinOfDay < 12 * 60 || endMinOfDay > 22 * 60) return true;
     } else { // Saturday to Wednesday (except Mon) 6pm to 12am
       if (startMinOfDay < 18 * 60 || endMinOfDay > 24 * 60) return true;
     }
@@ -365,8 +366,8 @@ export default function InteractiveCalendar({
           {displayDays.map((day, colIdx) => {
             const dayAppts = getApptsForDay(day);
             const dayOfWeek = day.getDay();
-            const isClosedDay = dayOfWeek === 4 || dayOfWeek === 5;
-            
+            const isClosedDay = dayOfWeek === 5;
+
             return (
               <div key={colIdx} className="flex-1 relative cal-slot-col"
                 style={{
@@ -393,14 +394,18 @@ export default function InteractiveCalendar({
               >
                 {/* Hour lines */}
                 {Array.from({ length: TOTAL_HOURS }, (_, i) => {
-                  const hour24 = DAY_START + i;
-                  const isWorking = isClosedDay ? false : (dayOfWeek === 1 ? (hour24 >= 10 && hour24 < 16) : (hour24 >= 18 && hour24 < 24));
+                  const h24 = DAY_START + i;
+                  const isWorking = isClosedDay ? false : (
+                    dayOfWeek === 1 ? (h24 >= 10 && h24 < 16) :
+                    dayOfWeek === 4 ? (h24 >= 12 && h24 < 22) :
+                    (h24 >= 18 && h24 < 24)
+                  );
 
                   return (
                     <div key={i} className="absolute w-full"
-                      style={{ 
-                        top: i * HOUR_HEIGHT, 
-                        height: HOUR_HEIGHT, 
+                      style={{
+                        top: i * HOUR_HEIGHT,
+                        height: HOUR_HEIGHT,
                         borderTop: '1px solid rgba(201,168,76,0.06)',
                         background: isWorking ? 'transparent' : 'rgba(0,0,0,0.4)',
                       }}>
@@ -446,6 +451,12 @@ export default function InteractiveCalendar({
           })}
         </div>
       </div>
+
+      {/* ─── Closed-day notice ───────────────────────────────────────────── */}
+      <p className="text-center text-xs mt-3 mb-1" style={{ color: '#3A3A4A' }}>
+        <Clock className="w-3.5 h-3.5 inline mr-1 opacity-40" />
+        Working hours: Sat–Wed 6 PM–12 AM · Mon 10 AM–4 PM · Thu 12 PM–10 PM · Fri closed
+      </p>
 
       {/* ─── Booking Modal ────────────────────────────────────────────────── */}
       {modal.isOpen && modal.startTime && modal.endTime && modal.service && (

@@ -194,7 +194,7 @@ export default function DoctorCalendar({ appointments }: DoctorCalendarProps) {
           {displayDays.map((day, colIdx) => {
             const dayAppts   = getApptsForDay(day);
             const dow        = day.getDay();
-            const isClosed   = dow === 4 || dow === 5; // Thu/Fri off
+            const isClosed   = dow === 5; // Fri off
 
             return (
               <div key={colIdx} className="flex-1 relative"
@@ -209,7 +209,11 @@ export default function DoctorCalendar({ appointments }: DoctorCalendarProps) {
                 {/* Hour lines + working-hour shading */}
                 {Array.from({ length: TOTAL_HOURS }, (_, i) => {
                   const h24 = DAY_START + i;
-                  const isWorking = isClosed ? false : (dow === 1 ? (h24 >= 10 && h24 < 16) : (h24 >= 18 && h24 < 24));
+                  const isWorking = isClosed ? false : (
+                    dow === 1 ? (h24 >= 10 && h24 < 16) :
+                    dow === 4 ? (h24 >= 12 && h24 < 22) :
+                    (h24 >= 18 && h24 < 24)
+                  );
                   return (
                     <div key={i} className="absolute w-full"
                       style={{
@@ -249,7 +253,7 @@ export default function DoctorCalendar({ appointments }: DoctorCalendarProps) {
       {/* ── Closed-day notice ───────────────────────────────────────────── */}
       <p className="text-center text-xs mt-2" style={{ color: '#3A3A4A' }}>
         <Clock className="w-3.5 h-3.5 inline mr-1 opacity-40" />
-        Working hours: Sat–Wed 6 PM–12 AM · Monday 10 AM–4 PM · Thu–Fri closed
+        Working hours: Sat–Wed 6 PM–12 AM · Monday 10 AM–4 PM · Thu 12 PM–10 PM · Fri closed
       </p>
     </div>
   );
