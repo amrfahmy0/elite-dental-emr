@@ -57,54 +57,81 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
           schema: 'public',
           table: 'appointments',
         },
-        (payload) => {
+        async (payload) => {
           const { eventType, new: newRow, old: oldRow } = payload;
 
-          setQueue(prev => {
-            if (eventType === 'DELETE') {
-              return prev.filter(a => a.id !== (oldRow as any).id);
-            }
+          if (eventType === 'DELETE') {
+            setQueue(prev => prev.filter(a => a.id !== (oldRow as any).id));
+            return;
+          }
 
-            const updated = newRow as any;
+          const updated = newRow as any;
 
-            // For the doctor panel, only track their own appointments
-            if (role === 'DOCTOR' && doctorId && updated.doctor_id !== doctorId) {
-              return prev;
-            }
+          // For the doctor panel, only track their own appointments
+          if (role === 'DOCTOR' && doctorId && updated.doctor_id !== doctorId) {
+            return;
+          }
 
-            // Check if the appointment belongs to today (local date)
-            const apptDate = new Date(updated.start_time);
-            const today    = new Date();
-            const isToday  =
-              apptDate.getFullYear() === today.getFullYear() &&
-              apptDate.getMonth()    === today.getMonth()    &&
-              apptDate.getDate()     === today.getDate();
+          // Check if the appointment belongs to today (local date)
+          const apptDate = new Date(updated.start_time);
+          const today    = new Date();
+          const isToday  =
+            apptDate.getFullYear() === today.getFullYear() &&
+            apptDate.getMonth()    === today.getMonth()    &&
+            apptDate.getDate()     === today.getDate();
 
-            if (!isToday) return prev; // ignore appointments on other days
+          if (!isToday) return; // ignore appointments on other days
 
-            if (eventType === 'INSERT') {
-              // Avoid duplicates (initial data might already include it)
+          if (eventType === 'INSERT') {
+            // 1. Instantly add a placeholder to the UI
+            setQueue(prev => {
               if (prev.some(a => a.id === updated.id)) return prev;
-              // We only have the raw row here – attach a placeholder for joined data
-              const enriched: QueueAppt = {
+              const placeholder: QueueAppt = {
                 ...updated,
-                patient: updated.patient ?? { id: '', first_name: '—', last_name: '', patient_id: '', has_bleeding_disorder: false },
-                service: updated.service ?? undefined,
-                doctor:  updated.doctor  ?? undefined,
+                patient: { id: '', first_name: 'Loading...', last_name: '', patient_id: '...', has_bleeding_disorder: false },
+                service: { name: '...' },
               };
-              return [...prev, enriched].sort(
+              return [...prev, placeholder].sort(
                 (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
               );
-            }
+            });
 
-            if (eventType === 'UPDATE') {
-              return prev.map(a =>
-                a.id === updated.id ? { ...a, ...updated } : a
-              );
-            }
+            // 2. Async fetch the full relation data (patient, service, doctor)
+            const { data } = await supabase
+              .from('appointments')
+              .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
+              .eq('id', updated.id)
+              .single();
 
-            return prev;
-          });
+            if (data) {
+              setQueue(prev => prev.map(a => a.id === data.id ? (data as QueueAppt) : a));
+            }
+          }
+
+          if (eventType === 'UPDATE') {
+            // In case of an update where we don't have the relations loaded (e.g. moved from another day)
+            // we will fetch the full data as well just to be safe.
+            const { data } = await supabase
+              .from('appointments')
+              .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
+              .eq('id', updated.id)
+              .single();
+
+            if (data) {
+              setQueue(prev => {
+                if (prev.some(a => a.id === data.id)) {
+                  return prev.map(a => a.id === data.id ? (data as QueueAppt) : a);
+                } else {
+                  return [...prev, data as QueueAppt].sort(
+                    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+                  );
+                }
+              });
+            } else {
+              // Fallback to just patching what we have
+              setQueue(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
+            }
+          }
         }
       )
       .subscribe((status) => {
