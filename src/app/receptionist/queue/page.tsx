@@ -2,6 +2,9 @@ import { supabaseAdmin } from '@/lib/supabase';
 import QueuePanel from '@/components/QueuePanel';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 
 export default async function QueuePage() {
   const todayStart = new Date(new Date().setHours(0,0,0,0)).toISOString();

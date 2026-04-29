@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { Clock, ChevronRight, AlertTriangle, CalendarDays, CheckCircle2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 
 async function completeSession(formData: FormData) {
   'use server';
