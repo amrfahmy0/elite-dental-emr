@@ -213,7 +213,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
         )}
 
         {queue.map(appt => {
-          const pt        = appt.patient;
+          const pt        = appt.patient || { first_name: '?', last_name: '?', patient_id: '...', has_bleeding_disorder: false };
           const meta      = STATUS_META[appt.status] ?? STATUS_META.SCHEDULED;
           const isLoading = loadingId === appt.id;
           const startTime = new Date(appt.start_time);
@@ -233,13 +233,13 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                   <p className="text-sm font-black" style={{ color: '#E8E8F0' }}>
                     {startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                   </p>
-                  <p className="text-[10px]" style={{ color: '#3A3A4A' }}>{appt.service?.name?.slice(0, 9)}</p>
+                  <p className="text-[10px]" style={{ color: '#3A3A4A' }}>{appt.service?.name?.slice(0, 9) || '...'}</p>
                 </div>
 
                 {/* Avatar */}
                 <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
                   style={{ background: 'rgba(201,168,76,0.12)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }}>
-                  {pt.first_name[0]}{pt.last_name[0]}
+                  {pt.first_name?.[0] || '?'}{pt.last_name?.[0] || '?'}
                 </div>
 
                 {/* Patient info */}
