@@ -4,24 +4,30 @@ import QueuePanel from '@/components/QueuePanel';
 export const dynamic = 'force-dynamic';
 
 export default async function QueuePage() {
-  const todayStart = new Date(new Date().setHours(0,0,0,0)).toISOString();
-  const todayEnd   = new Date(new Date().setHours(23,59,59,999)).toISOString();
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 2);
 
-  const { data: appts } = await supabaseAdmin
+  const { data: apptsRes } = await supabaseAdmin
     .from('appointments')
     .select(`*, patient:patients(*), service:services(*), doctor:users(*)`)
-    .gte('start_time', todayStart)
-    .lte('start_time', todayEnd)
+    .gte('start_time', yesterday.toISOString())
+    .lte('start_time', tomorrow.toISOString())
     .order('start_time', { ascending: true });
 
-  const queue = appts || [];
+  const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
+  const queue = (apptsRes || [])
+    .filter(a => a.status !== 'CANCELLED')
+    .filter(a => new Date(a.start_time).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) === cairoTodayString);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gold-gradient">Today's Queue</h1>
         <p className="text-sm mt-0.5" style={{ color: '#6A6A7A' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          {new Date().toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
 
