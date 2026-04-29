@@ -208,19 +208,18 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
                 </div>
 
                 {/* Patient info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <p className="font-semibold text-sm truncate" style={{ color: '#E8E8F0' }}>
                       {pt.first_name} {pt.last_name}
                     </p>
                     {pt.has_bleeding_disorder && (
-                      <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                      <span className="flex items-center gap-0.5 shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
                         style={{ background: 'rgba(220,38,38,0.2)', color: '#EF4444', border: '1px solid rgba(220,38,38,0.4)' }}>
-                        <AlertTriangle className="w-2.5 h-2.5" /> ⚠
+                        <AlertTriangle className="w-2 h-2" /> ⚠
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px]" style={{ color: '#5A5A6A' }}>{pt.patient_id}</p>
                   {appt.chief_complaint && (
                     <p className="text-[11px] mt-0.5 truncate" style={{ color: '#A87E30' }}>"{appt.chief_complaint}"</p>
                   )}

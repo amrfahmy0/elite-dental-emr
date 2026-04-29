@@ -84,7 +84,7 @@ export default async function ReceptionistDashboard() {
         </div>
 
         {/* Queue Panel — right sidebar */}
-        <div className="w-96 shrink-0 overflow-y-auto rounded-2xl p-4"
+        <div className="w-[420px] shrink-0 overflow-y-auto rounded-2xl p-4"
           style={{ background: 'rgba(7,14,26,0.7)', border: '1px solid rgba(201,168,76,0.1)' }}>
           <QueuePanel initialQueue={todayAppts as any} role="RECEPTIONIST" />
         </div>
