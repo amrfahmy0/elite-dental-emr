@@ -229,6 +229,40 @@ export async function deleteVisitAction(visitId: string, patientId: string) {
   return { success: true };
 }
 
+export async function getArrivalNotificationDataAction(appointmentId: string) {
+  const { data: appt, error: apptError } = await supabaseAdmin
+    .from('appointments')
+    .select('*, patient:patients(*)')
+    .eq('id', appointmentId)
+    .single();
+    
+  if (apptError || !appt) return { error: apptError?.message || 'Appointment not found' };
+
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 2);
+
+  const { data: waitingAppts } = await supabaseAdmin
+    .from('appointments')
+    .select('id, start_time')
+    .eq('doctor_id', appt.doctor_id)
+    .eq('status', 'WAITING')
+    .gte('start_time', yesterday.toISOString())
+    .lte('start_time', tomorrow.toISOString());
+
+  const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
+  const waitingCount = (waitingAppts || []).filter(a => 
+    new Date(a.start_time).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) === cairoTodayString
+  ).length;
+
+  return { 
+    patientName: `${appt.patient?.first_name} ${appt.patient?.last_name}`,
+    waitingCount
+  };
+}
+
 export async function updateVisitAction(visitId: string, patientId: string, formData: FormData) {
   const { error } = await supabaseAdmin.from('visits').update({
     tooth_numbers: formData.get('tooth_numbers') as string || null,

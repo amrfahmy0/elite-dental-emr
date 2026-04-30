@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import ArrivalNotifier from '@/components/ArrivalNotifier';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function DoctorLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default async function DoctorLayout({ children }: { children: React.React
           {children}
         </div>
       </main>
+      <ArrivalNotifier doctorId={userId} />
     </div>
   );
 }
