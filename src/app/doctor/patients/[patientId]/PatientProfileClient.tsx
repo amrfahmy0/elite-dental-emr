@@ -143,7 +143,7 @@ function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUse
         <div className="grid grid-cols-2 gap-2 text-sm mb-4">
           <div><strong>Patient:</strong> {patient.first_name} {patient.last_name}</div>
           <div><strong>ID:</strong> {patient.patient_id}</div>
-          <div><strong>Doctor:</strong> Dr. {visit.doctor?.full_name}</div>
+          <div><strong>Doctor:</strong> {visit.doctor?.full_name?.startsWith('Dr.') ? visit.doctor.full_name : `Dr. ${visit.doctor?.full_name}`}</div>
           <div><strong>Date:</strong> {new Date(visit.visit_date).toLocaleDateString()}</div>
           {visit.tooth_numbers && <div className="col-span-2"><strong>Tooth #:</strong> {visit.tooth_numbers}</div>}
           {visit.procedure_performed && <div className="col-span-2"><strong>Procedure:</strong> {visit.procedure_performed}</div>}

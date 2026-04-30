@@ -50,7 +50,9 @@ export default async function DoctorDashboard() {
           style={{ background: 'radial-gradient(circle, #C9A84C, transparent)', transform: 'translate(30%, -30%)' }} />
         <div className="relative z-10">
           <p className="text-sm mb-1" style={{ color: '#8A8A9A' }}>{greetingText},</p>
-          <h1 className="text-3xl font-bold text-gold-gradient mb-1">Dr. {doctor?.full_name || 'Doctor'}</h1>
+          <h1 className="text-3xl font-bold text-gold-gradient mb-1">
+            {doctor?.full_name?.startsWith('Dr.') ? doctor.full_name : `Dr. ${doctor?.full_name || 'Doctor'}`}
+          </h1>
           <p className="text-sm flex items-center gap-2" style={{ color: '#6A6A7A' }}>
             <CalendarDays className="w-4 h-4" />
             {now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
