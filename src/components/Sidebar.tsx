@@ -6,7 +6,7 @@ import { logoutAction } from '@/app/actions';
 import { useTransition } from 'react';
 import {
   Stethoscope, LayoutDashboard, Users, CalendarDays,
-  FileText, LogOut, ChevronRight, Menu, X, ListChecks
+  FileText, LogOut, ChevronRight, Menu, X, ListChecks, TrendingUp
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -25,6 +25,7 @@ const doctorNav: NavItem[] = [
   { label: 'Dashboard',   href: '/doctor/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { label: 'My Schedule', href: '/doctor/calendar',  icon: <CalendarDays className="w-5 h-5" /> },
   { label: 'My Patients', href: '/doctor/patients',  icon: <Users className="w-5 h-5" /> },
+  { label: 'Analytics',   href: '/doctor/analytics', icon: <TrendingUp className="w-5 h-5" /> },
 ];
 
 const receptionistNav: NavItem[] = [
