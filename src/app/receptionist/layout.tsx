@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import BillingNotifier from '@/components/BillingNotifier';
+import EnterNotifier from '@/components/EnterNotifier';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function ReceptionistLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default async function ReceptionistLayout({ children }: { children: React
         </div>
       </main>
       <BillingNotifier />
+      <EnterNotifier />
     </div>
   );
 }

@@ -263,6 +263,24 @@ export async function getArrivalNotificationDataAction(appointmentId: string) {
   };
 }
 
+export async function getEnterNotificationDataAction(appointmentId: string) {
+  const { data: appt, error: apptError } = await supabaseAdmin
+    .from('appointments')
+    .select('patient:patients(*), doctor:users(*)')
+    .eq('id', appointmentId)
+    .single();
+    
+  if (apptError || !appt) return { error: apptError?.message || 'Appointment not found' };
+
+  const patient = appt.patient as any;
+  const doctor = appt.doctor as any;
+
+  return { 
+    patientName: `${patient?.first_name} ${patient?.last_name}`,
+    doctorName: doctor?.full_name || 'Unknown Doctor'
+  };
+}
+
 export async function updateVisitAction(visitId: string, patientId: string, formData: FormData) {
   const { error } = await supabaseAdmin.from('visits').update({
     tooth_numbers: formData.get('tooth_numbers') as string || null,
