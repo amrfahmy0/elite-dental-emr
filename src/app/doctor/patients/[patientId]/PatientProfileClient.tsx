@@ -159,7 +159,7 @@ function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUse
                   <ul className="list-disc pl-5 text-sm space-y-1">
                     {parsed.map((med: any, i: number) => (
                       <li key={i}>
-                        <strong>{med.name}</strong>: Take {med.amount} every {med.frequency} for {med.duration}.
+                        <strong>{med.name}</strong>: Take {med.amount} pill(s) every {med.frequency} hours for {med.duration} days.
                       </li>
                     ))}
                   </ul>
@@ -253,7 +253,7 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
                         if (Array.isArray(parsed)) {
                           return parsed.map((med: any, i: number) => (
                             <li key={i}>
-                              <strong style={{ color: '#E8E8F0' }}>{med.name}</strong>: Take {med.amount} every {med.frequency} for {med.duration}.
+                              <strong style={{ color: '#E8E8F0' }}>{med.name}</strong>: Take {med.amount} pill(s) every {med.frequency} hours for {med.duration} days.
                             </li>
                           ));
                         }
@@ -628,9 +628,9 @@ export default function PatientProfileClient({ patient, visits, doctors, service
                     <div key={idx} className="flex items-start gap-2 relative group">
                       <div className="flex-1 grid grid-cols-12 gap-2">
                         <input placeholder="Medication (e.g. Augmentin 1g)" value={med.name} onChange={e => updateMed(idx, 'name', e.target.value)} className="col-span-12 sm:col-span-4 input-premium text-xs" />
-                        <input placeholder="Amount (e.g. 1 pill)" value={med.amount} onChange={e => updateMed(idx, 'amount', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
-                        <input placeholder="Frequency (e.g. 12 hours)" value={med.frequency} onChange={e => updateMed(idx, 'frequency', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
-                        <input placeholder="Duration (e.g. 5 days)" value={med.duration} onChange={e => updateMed(idx, 'duration', e.target.value)} className="col-span-12 sm:col-span-2 input-premium text-xs" />
+                        <input placeholder="Amount (e.g. 1)" value={med.amount} onChange={e => updateMed(idx, 'amount', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                        <input placeholder="Freq. in hours (e.g. 12)" value={med.frequency} onChange={e => updateMed(idx, 'frequency', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                        <input placeholder="Days (e.g. 5)" value={med.duration} onChange={e => updateMed(idx, 'duration', e.target.value)} className="col-span-12 sm:col-span-2 input-premium text-xs" />
                       </div>
                       <button type="button" onClick={() => removeMedication(idx)} className="p-2.5 rounded-xl border border-red-500/20 text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors shrink-0">
                         <Trash2 className="w-4 h-4" />
