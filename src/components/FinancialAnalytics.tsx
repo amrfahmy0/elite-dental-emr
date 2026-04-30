@@ -67,8 +67,15 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
 
         // Procedures
         if (v.procedure_performed) {
-          const procString = v.procedure_performed.trim();
-          procedureMap.set(procString, (procedureMap.get(procString) || 0) + totalCost);
+          const procNames = v.procedure_performed.split(',').map(s => s.trim()).filter(Boolean);
+          if (procNames.length > 0) {
+            const distributedCost = totalCost / procNames.length;
+            procNames.forEach(proc => {
+              procedureMap.set(proc, (procedureMap.get(proc) || 0) + distributedCost);
+            });
+          } else {
+            procedureMap.set('General / Checkup', (procedureMap.get('General / Checkup') || 0) + totalCost);
+          }
         } else {
           procedureMap.set('General / Checkup', (procedureMap.get('General / Checkup') || 0) + totalCost);
         }
