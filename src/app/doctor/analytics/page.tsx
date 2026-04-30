@@ -11,7 +11,7 @@ export default async function DoctorAnalyticsPage() {
 
   const { data: visitsRes } = await supabaseAdmin
     .from('visits')
-    .select('*')
+    .select('*, patient:patients(*)')
     .eq('doctor_id', doctorId!)
     .order('visit_date', { ascending: false });
 

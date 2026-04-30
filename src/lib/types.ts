@@ -82,5 +82,6 @@ export interface Visit {
   created_at: string;
   updated_at: string;
   doctor?: AppUser;
+  patient?: Patient;
   attachments?: Attachment[];
 }

@@ -13,36 +13,93 @@ interface FinancialAnalyticsProps {
 }
 
 export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) {
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const { realDailyData, realProcedureData, realDebtors } = useMemo(() => {
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1; // 0-indexed month
 
-  // --- MOCK DATA FOR CHARTS & TABLES ---
-  const mockDailyData = [
-    { date: '1', revenue: 1200 }, { date: '3', revenue: 1900 }, { date: '5', revenue: 800 },
-    { date: '7', revenue: 2500 }, { date: '9', revenue: 3100 }, { date: '11', revenue: 1400 },
-    { date: '13', revenue: 2100 }, { date: '15', revenue: 3200 }, { date: '17', revenue: 4100 },
-    { date: '19', revenue: 2800 }, { date: '21', revenue: 1500 }, { date: '23', revenue: 2200 },
-    { date: '25', revenue: 1800 }, { date: '27', revenue: 3800 }, { date: '29', revenue: 4500 },
-    { date: '31', revenue: 1900 },
-  ];
+    const startOfMonth = new Date(year, month, 1).getTime();
+    const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
 
-  const mockProcedureData = [
-    { name: 'Implants', value: 45000, color: '#C9A84C' },
-    { name: 'Crowns', value: 25000, color: '#4F9CF9' },
-    { name: 'Root Canals', value: 15000, color: '#10B981' },
-    { name: 'Extractions', value: 8000, color: '#F59E0B' },
-    { name: 'Whitening', value: 5000, color: '#A87E30' },
-  ];
+    // 1. Daily Revenue Trend (for selected month)
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const dailyMap = new Map<number, number>();
+    for (let i = 1; i <= daysInMonth; i++) dailyMap.set(i, 0);
 
-  const mockDebtors = [
-    { id: 1, name: 'Ahmed Sayed', phone: '01012345678', lastVisit: 'May 10, 2026', owed: 1500 },
-    { id: 2, name: 'Sara Kamel', phone: '01298765432', lastVisit: 'May 14, 2026', owed: 4200 },
-    { id: 3, name: 'Mona Youssef', phone: '01123456789', lastVisit: 'Apr 28, 2026', owed: 850 },
-    { id: 4, name: 'Khaled Omar', phone: '01567891234', lastVisit: 'May 02, 2026', owed: 2100 },
-  ];
-  // -------------------------------------
+    // 2. Revenue by Procedure (for selected month)
+    const procedureMap = new Map<string, number>();
+
+    // 3. Actionable Debtors Table (All Time)
+    const debtorMap = new Map<string, { id: string, name: string, phone: string, lastVisit: number, owed: number }>();
+
+    visits.forEach(v => {
+      if (!v.visit_date) return;
+      const visitTime = new Date(v.visit_date).getTime();
+      const totalCost = v.total_cost || 0;
+      const amountPaid = v.amount_paid || 0;
+      const debtFromVisit = totalCost - amountPaid;
+
+      // Accumulate all-time debt for debtors table
+      const patientId = v.patient_id;
+      if (!debtorMap.has(patientId)) {
+        debtorMap.set(patientId, {
+          id: patientId,
+          name: v.patient ? `${v.patient.first_name} ${v.patient.last_name}` : 'Unknown Patient',
+          phone: v.patient?.contact_number || 'N/A',
+          lastVisit: visitTime,
+          owed: 0
+        });
+      }
+      const debtor = debtorMap.get(patientId)!;
+      debtor.owed += debtFromVisit;
+      if (visitTime > debtor.lastVisit) debtor.lastVisit = visitTime;
+
+      // Process strictly within the selected month
+      if (visitTime >= startOfMonth && visitTime <= endOfMonth) {
+        // Daily
+        const day = new Date(v.visit_date).getDate();
+        dailyMap.set(day, dailyMap.get(day)! + totalCost);
+
+        // Procedures
+        if (v.procedure_performed) {
+          const procString = v.procedure_performed.trim();
+          procedureMap.set(procString, (procedureMap.get(procString) || 0) + totalCost);
+        } else {
+          procedureMap.set('General / Checkup', (procedureMap.get('General / Checkup') || 0) + totalCost);
+        }
+      }
+    });
+
+    const dailyData = Array.from(dailyMap.entries()).map(([day, rev]) => ({
+      date: day.toString(),
+      revenue: rev
+    }));
+
+    const COLORS = ['#C9A84C', '#4F9CF9', '#10B981', '#F59E0B', '#A87E30', '#8A8A9A'];
+    let colorIndex = 0;
+    const procedureData = Array.from(procedureMap.entries())
+      .map(([name, val]) => ({
+        name: name.length > 25 ? name.slice(0,25) + '...' : name,
+        value: val,
+        color: COLORS[colorIndex++ % COLORS.length]
+      }))
+      .filter(p => p.value > 0)
+      .sort((a, b) => b.value - a.value);
+
+    const debtors = Array.from(debtorMap.values())
+      .filter(d => d.owed > 0)
+      .sort((a, b) => b.owed - a.owed)
+      .map(d => ({
+        ...d,
+        lastVisit: new Date(d.lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      }));
+
+    return {
+      realDailyData: dailyData,
+      realProcedureData: procedureData,
+      realDebtors: debtors
+    };
+  }, [visits, selectedMonth]);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -188,10 +245,10 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
         
         {/* Daily Revenue Trend (2/3 width) */}
         <div className="flex-[2] glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
-          <h3 className="text-sm font-bold mb-6" style={{ color: '#E8E8F0' }}>Daily Revenue Trend (Mock)</h3>
+          <h3 className="text-sm font-bold mb-6" style={{ color: '#E8E8F0' }}>Daily Revenue Trend</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockDailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={realDailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#C9A84C" stopOpacity={0.3}/>
@@ -213,36 +270,42 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
 
         {/* Revenue by Procedure (1/3 width) */}
         <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
-          <h3 className="text-sm font-bold mb-2" style={{ color: '#E8E8F0' }}>Revenue by Procedure (Mock)</h3>
+          <h3 className="text-sm font-bold mb-2" style={{ color: '#E8E8F0' }}>Revenue by Procedure</h3>
           <div className="flex-1 w-full min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={mockProcedureData}
-                  cx="50%"
-                  cy="45%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {mockProcedureData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(201,168,76,0.2)', borderRadius: '8px', color: '#fff' }}
-                  itemStyle={{ fontWeight: 'bold' }}
-                  formatter={(value: number) => `${formatCurrency(value)}`}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36} 
-                  iconType="circle"
-                  formatter={(value, entry: any) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
-                />
-              </PieChart>
+              {realProcedureData.length > 0 ? (
+                <PieChart>
+                  <Pie
+                    data={realProcedureData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {realProcedureData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(201,168,76,0.2)', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${formatCurrency(value)}`}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36} 
+                    iconType="circle"
+                    formatter={(value, entry: any) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
+                  />
+                </PieChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6A6A7A' }}>
+                  No revenue data for this month
+                </div>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -252,7 +315,7 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
       <div className="mt-6 glass-card-light rounded-2xl border overflow-hidden" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
         <div className="p-5 border-b" style={{ borderColor: 'rgba(239,68,68,0.1)', background: 'rgba(239,68,68,0.03)' }}>
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#EF4444' }}>
-            <AlertCircle className="w-4 h-4" /> Actionable Debtors (Mock)
+            <AlertCircle className="w-4 h-4" /> Actionable Debtors
           </h3>
           <p className="text-xs mt-1" style={{ color: '#8A8A9A' }}>Patients actively contributing to the Total Outstanding Balance</p>
         </div>
@@ -268,7 +331,7 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-              {mockDebtors.map((debtor) => (
+              {realDebtors.length > 0 ? realDebtors.map((debtor) => (
                 <tr key={debtor.id} className="transition-colors hover:bg-white/[0.02]">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -300,7 +363,13 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
                     </button>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-xs" style={{ color: '#6A6A7A' }}>
+                    No patients with outstanding balances.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
