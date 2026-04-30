@@ -157,7 +157,7 @@ function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUse
               if (Array.isArray(parsed)) {
                 return (
                   <ul className="list-disc pl-5 text-sm space-y-1">
-                    {parsed.map((med: any, i: number) => (
+                    {parsed.map((med: { name: string; amount: string; frequency: string; duration: string }, i: number) => (
                       <li key={i}>
                         <strong>{med.name}</strong>: Take {med.amount} pill(s) every {med.frequency} hours for {med.duration} days.
                       </li>
@@ -251,7 +251,7 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
                       try {
                         const parsed = JSON.parse(visit.prescription);
                         if (Array.isArray(parsed)) {
-                          return parsed.map((med: any, i: number) => (
+                          return parsed.map((med: { name: string; amount: string; frequency: string; duration: string }, i: number) => (
                             <li key={i}>
                               <strong style={{ color: '#E8E8F0' }}>{med.name}</strong>: Take {med.amount} pill(s) every {med.frequency} hours for {med.duration} days.
                             </li>

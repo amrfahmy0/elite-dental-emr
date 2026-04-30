@@ -75,6 +75,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
     }
 
     prevQueueRef.current = initialQueue;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQueue(initialQueue);
   }, [initialQueue, role]);
 
