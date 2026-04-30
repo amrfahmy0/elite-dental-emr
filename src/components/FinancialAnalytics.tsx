@@ -281,16 +281,16 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
         </div>
 
         {/* Revenue by Procedure (1/3 width) */}
-        <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
+        <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col justify-center" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
           <h3 className="text-sm font-bold mb-2" style={{ color: '#E8E8F0' }}>Revenue by Procedure</h3>
-          <div className="flex-1 w-full min-h-[300px]">
+          <div className="flex-1 w-full min-h-[300px] flex flex-col justify-center">
             <ResponsiveContainer width="100%" height="100%">
               {realProcedureData.length > 0 ? (
                 <PieChart>
                   <Pie
                     data={realProcedureData}
                     cx="50%"
-                    cy="45%"
+                    cy="40%"
                     innerRadius={60}
                     outerRadius={80}
                     paddingAngle={5}
@@ -310,6 +310,7 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
                     verticalAlign="bottom" 
                     height={36} 
                     iconType="circle"
+                    wrapperStyle={{ marginTop: '-25px' }}
                     formatter={(value, entry: any) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
                   />
                 </PieChart>
