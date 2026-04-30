@@ -13,6 +13,11 @@ interface FinancialAnalyticsProps {
 }
 
 export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) {
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
   const { realDailyData, realProcedureData, realDebtors } = useMemo(() => {
     const [yearStr, monthStr] = selectedMonth.split('-');
     const year = parseInt(yearStr);
