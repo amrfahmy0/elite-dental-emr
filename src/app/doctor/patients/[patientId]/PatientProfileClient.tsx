@@ -342,6 +342,7 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [visitCost, setVisitCost] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [prescriptionList, setPrescriptionList] = useState<{name: string, dosage: string, duration: string}[]>([]);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
   // Calculate total outstanding balance by looking at the most recent visit
@@ -388,8 +389,25 @@ export default function PatientProfileClient({ patient, visits, doctors, service
     const names = visit.procedure_performed?.split(', ') || [];
     const matchedIds = names.map(n => services.find(s => s.name === n)?.id).filter(Boolean) as string[];
     setSelectedServiceIds(matchedIds);
+
+    let parsedPrescription = [];
+    try {
+      if (visit.prescription) {
+        parsedPrescription = JSON.parse(visit.prescription);
+        if (!Array.isArray(parsedPrescription)) throw new Error();
+      }
+    } catch {
+      if (visit.prescription) parsedPrescription = [{ name: visit.prescription, dosage: '', duration: '' }];
+    }
+    setPrescriptionList(parsedPrescription);
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const addMedication = () => setPrescriptionList(prev => [...prev, { name: '', dosage: '', duration: '' }]);
+  const removeMedication = (index: number) => setPrescriptionList(prev => prev.filter((_, i) => i !== index));
+  const updateMed = (index: number, field: string, value: string) => {
+    setPrescriptionList(prev => prev.map((med, i) => i === index ? { ...med, [field]: value } : med));
   };
 
   const addFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -447,8 +465,8 @@ export default function PatientProfileClient({ patient, visits, doctors, service
             </div>
           </div>
 
-          <button onClick={() => { setEditingVisit(null); setShowVisitForm(true); }}
-            className="btn-gold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shrink-0">
+          <button onClick={() => { setEditingVisit(null); setShowVisitForm(true); setPrescriptionList([]); setVisitCost(0); setSelectedServiceIds([]); }}
+            className="btn-primary px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shrink-0">
             <Plus className="w-4 h-4" /> New Visit
           </button>
         </div>
@@ -557,9 +575,38 @@ export default function PatientProfileClient({ patient, visits, doctors, service
               <textarea name="diagnosis" defaultValue={editingVisit?.diagnosis || ''} rows={2} placeholder="ICD code or description…" className="input-premium resize-none" />
             </Field>
 
-            <Field label="Prescription (℞)">
-              <textarea name="prescription" defaultValue={editingVisit?.prescription || ''} rows={3} placeholder="Amoxicillin 500mg 1×3 for 5 days&#10;Ibuprofen 400mg PRN&#10;Chlorhexidine rinse" className="input-premium resize-none font-mono text-xs" />
-            </Field>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-widest" style={{ color: '#8A8A9A' }}>Prescription (℞)</label>
+                <button type="button" onClick={addMedication} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-1.5 rounded-lg transition-colors"
+                  style={{ background: 'rgba(79,156,249,0.1)', color: '#4F9CF9', border: '1px solid rgba(79,156,249,0.3)' }}>
+                  <Plus className="w-3 h-3" /> Add Medication
+                </button>
+              </div>
+              
+              {prescriptionList.length > 0 ? (
+                <div className="space-y-2">
+                  {prescriptionList.map((med, idx) => (
+                    <div key={idx} className="flex items-start gap-2 relative group">
+                      <div className="flex-1 grid grid-cols-12 gap-2">
+                        <input placeholder="Medication (e.g. Augmentin 1g)" value={med.name} onChange={e => updateMed(idx, 'name', e.target.value)} className="col-span-12 sm:col-span-5 input-premium text-xs" />
+                        <input placeholder="Dosage (e.g. 1 pill/12h)" value={med.dosage} onChange={e => updateMed(idx, 'dosage', e.target.value)} className="col-span-12 sm:col-span-4 input-premium text-xs" />
+                        <input placeholder="Duration (e.g. 5 days)" value={med.duration} onChange={e => updateMed(idx, 'duration', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                      </div>
+                      <button type="button" onClick={() => removeMedication(idx)} className="p-2.5 rounded-xl border border-red-500/20 text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors shrink-0">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-6 border border-dashed rounded-xl border-white/10 text-[#6A6A7A] text-xs">
+                  No medications prescribed. Click "+ Add Medication" to start.
+                </div>
+              )}
+              {/* Stringify the dynamic array into the existing text column */}
+              <input type="hidden" name="prescription" value={JSON.stringify(prescriptionList)} />
+            </div>
 
             {/* Billing */}
             <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.12)' }}>
