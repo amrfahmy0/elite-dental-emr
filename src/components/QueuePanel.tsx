@@ -210,8 +210,8 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
 
                 {/* Patient info */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
-                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                    <p className="font-semibold text-sm leading-tight" style={{ color: '#E8E8F0', wordBreak: 'break-word' }}>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <p className="flex-1 min-w-0 font-semibold text-sm leading-tight whitespace-nowrap truncate" style={{ color: '#E8E8F0' }}>
                       {pt.first_name} {pt.last_name}
                     </p>
                     {pt.has_bleeding_disorder && (
