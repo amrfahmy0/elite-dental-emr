@@ -150,7 +150,26 @@ function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUse
         </div>
         <div className="border-t pt-4">
           <h3 className="font-bold mb-2">℞ Prescription</h3>
-          <p className="text-sm whitespace-pre-wrap">{visit.prescription || 'No prescription issued.'}</p>
+          {(() => {
+            if (!visit.prescription) return <p className="text-sm text-gray-500">No prescription issued.</p>;
+            try {
+              const parsed = JSON.parse(visit.prescription);
+              if (Array.isArray(parsed)) {
+                return (
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {parsed.map((med: any, i: number) => (
+                      <li key={i}>
+                        <strong>{med.name}</strong>: Take {med.amount} every {med.frequency} for {med.duration}.
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+              return <p className="text-sm whitespace-pre-wrap">{visit.prescription}</p>;
+            } catch {
+              return <p className="text-sm whitespace-pre-wrap">{visit.prescription}</p>;
+            }
+          })()}
         </div>
         <div className="border-t mt-4 pt-4 text-xs text-gray-500 text-center">
           This prescription is valid for 30 days from the issue date.
@@ -225,7 +244,26 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
             {visit.diagnosis && <Detail label="Diagnosis" value={visit.diagnosis} />}
             {visit.prescription && (
               <div>
-                <Detail label="Prescription" value={visit.prescription} />
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#6A6A7A' }}>Prescription</p>
+                  <ul className="list-disc pl-4 text-sm space-y-1" style={{ color: '#C8C4BC' }}>
+                    {(() => {
+                      try {
+                        const parsed = JSON.parse(visit.prescription);
+                        if (Array.isArray(parsed)) {
+                          return parsed.map((med: any, i: number) => (
+                            <li key={i}>
+                              <strong style={{ color: '#E8E8F0' }}>{med.name}</strong>: Take {med.amount} every {med.frequency} for {med.duration}.
+                            </li>
+                          ));
+                        }
+                        return <li className="whitespace-pre-wrap">{visit.prescription}</li>;
+                      } catch {
+                        return <li className="whitespace-pre-wrap">{visit.prescription}</li>;
+                      }
+                    })()}
+                  </ul>
+                </div>
                 <button onClick={() => window.print()}
                   className="mt-2 flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all hover:scale-105"
                   style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }}>
@@ -342,7 +380,7 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [visitCost, setVisitCost] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
-  const [prescriptionList, setPrescriptionList] = useState<{name: string, dosage: string, duration: string}[]>([]);
+  const [prescriptionList, setPrescriptionList] = useState<{name: string, amount: string, frequency: string, duration: string}[]>([]);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
   // Calculate total outstanding balance by looking at the most recent visit
@@ -397,14 +435,14 @@ export default function PatientProfileClient({ patient, visits, doctors, service
         if (!Array.isArray(parsedPrescription)) throw new Error();
       }
     } catch {
-      if (visit.prescription) parsedPrescription = [{ name: visit.prescription, dosage: '', duration: '' }];
+      if (visit.prescription) parsedPrescription = [{ name: visit.prescription, amount: '', frequency: '', duration: '' }];
     }
     setPrescriptionList(parsedPrescription);
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addMedication = () => setPrescriptionList(prev => [...prev, { name: '', dosage: '', duration: '' }]);
+  const addMedication = () => setPrescriptionList(prev => [...prev, { name: '', amount: '', frequency: '', duration: '' }]);
   const removeMedication = (index: number) => setPrescriptionList(prev => prev.filter((_, i) => i !== index));
   const updateMed = (index: number, field: string, value: string) => {
     setPrescriptionList(prev => prev.map((med, i) => i === index ? { ...med, [field]: value } : med));
@@ -589,9 +627,10 @@ export default function PatientProfileClient({ patient, visits, doctors, service
                   {prescriptionList.map((med, idx) => (
                     <div key={idx} className="flex items-start gap-2 relative group">
                       <div className="flex-1 grid grid-cols-12 gap-2">
-                        <input placeholder="Medication (e.g. Augmentin 1g)" value={med.name} onChange={e => updateMed(idx, 'name', e.target.value)} className="col-span-12 sm:col-span-5 input-premium text-xs" />
-                        <input placeholder="Dosage (e.g. 1 pill/12h)" value={med.dosage} onChange={e => updateMed(idx, 'dosage', e.target.value)} className="col-span-12 sm:col-span-4 input-premium text-xs" />
-                        <input placeholder="Duration (e.g. 5 days)" value={med.duration} onChange={e => updateMed(idx, 'duration', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                        <input placeholder="Medication (e.g. Augmentin 1g)" value={med.name} onChange={e => updateMed(idx, 'name', e.target.value)} className="col-span-12 sm:col-span-4 input-premium text-xs" />
+                        <input placeholder="Amount (e.g. 1 pill)" value={med.amount} onChange={e => updateMed(idx, 'amount', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                        <input placeholder="Frequency (e.g. 12 hours)" value={med.frequency} onChange={e => updateMed(idx, 'frequency', e.target.value)} className="col-span-12 sm:col-span-3 input-premium text-xs" />
+                        <input placeholder="Duration (e.g. 5 days)" value={med.duration} onChange={e => updateMed(idx, 'duration', e.target.value)} className="col-span-12 sm:col-span-2 input-premium text-xs" />
                       </div>
                       <button type="button" onClick={() => removeMedication(idx)} className="p-2.5 rounded-xl border border-red-500/20 text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors shrink-0">
                         <Trash2 className="w-4 h-4" />
