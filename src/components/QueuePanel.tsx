@@ -193,7 +193,7 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
               <div className="h-0.5 w-full"
                 style={{ background: `linear-gradient(90deg, ${meta.color}, transparent)` }} />
 
-              <div className="flex items-center gap-3 px-4 py-3">
+              <div className="flex items-center gap-3 px-4 py-4 min-h-[5rem]">
                 {/* Time */}
                 <div className="text-center w-14 shrink-0">
                   <p className="text-sm font-black" style={{ color: '#E8E8F0' }}>
@@ -210,8 +210,8 @@ export default function QueuePanel({ initialQueue, role, doctorId }: QueuePanelP
 
                 {/* Patient info */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <p className="flex-1 min-w-0 font-semibold text-sm leading-tight whitespace-nowrap truncate" style={{ color: '#E8E8F0' }}>
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <p className="font-semibold text-sm leading-tight break-words" style={{ color: '#E8E8F0' }}>
                       {pt.first_name} {pt.last_name}
                     </p>
                     {pt.has_bleeding_disorder && (
