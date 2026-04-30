@@ -48,7 +48,9 @@ export default function EnterNotifier() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6A6A7A' }}>Doctor</span>
-                    <span className="text-sm font-semibold ml-auto" style={{ color: '#C9A84C' }}>Dr. {doctorName}</span>
+                    <span className="text-sm font-semibold ml-auto" style={{ color: '#C9A84C' }}>
+                      {doctorName?.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`}
+                    </span>
                   </div>
                 </div>
 
