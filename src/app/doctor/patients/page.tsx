@@ -23,13 +23,14 @@ export default async function DoctorPatientsPage() {
     if (a.patient && !seen.has(a.patient_id)) {
       seen.add(a.patient_id);
       
-      const sortedVisits = (a.patient.visits || []).sort((x: any, y: any) => new Date(y.visit_date).getTime() - new Date(x.visit_date).getTime());
+      const patientAny = a.patient as any;
+      const sortedVisits = (patientAny.visits || []).sort((x: any, y: any) => new Date(y.visit_date).getTime() - new Date(x.visit_date).getTime());
       const latestVisit = sortedVisits.length > 0 ? sortedVisits[0] : null;
       const outstandingBalance = latestVisit 
         ? Math.max(0, (latestVisit.total_cost || 0) + (latestVisit.previous_balance || 0) - (latestVisit.amount_paid || 0))
         : 0;
 
-      patients.push({ ...a.patient, outstandingBalance });
+      patients.push({ ...patientAny, outstandingBalance });
     }
   });
 
