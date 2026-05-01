@@ -19,7 +19,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const { realDailyData, realProcedureData, realDebtors } = useMemo(() => {
+  const { realDailyData, realProcedureData, realDebtors, stats } = useMemo(() => {
     const [yearStr, monthStr] = selectedMonth.split('-');
     const year = parseInt(yearStr);
     const month = parseInt(monthStr) - 1; // 0-indexed month
