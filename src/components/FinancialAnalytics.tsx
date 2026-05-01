@@ -27,6 +27,9 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     const startOfMonth = new Date(year, month, 1).getTime();
     const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
 
+    let totalMonthlyRevenue = 0;
+    let totalCollected = 0;
+
     // 1. Daily Revenue Trend (for selected month)
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const dailyMap = new Map<number, number>();
@@ -35,33 +38,57 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     // 2. Revenue by Procedure (for selected month)
     const procedureMap = new Map<string, number>();
 
-    // 3. Actionable Debtors Table (All Time)
-    const debtorMap = new Map<string, { id: string, name: string, phone: string, lastVisit: number, owed: number }>();
+    // 3. Debt mapping per patient
+    const patientDebts = new Map<string, {
+      id: string, name: string, phone: string,
+      lastVisitTimeAllTime: number,
+      lastVisitTimeBeforeMonth: number,
+      owedAllTime: number,
+      owedBeforeMonth: number
+    }>();
 
     visits.forEach(v => {
       if (!v.visit_date) return;
       const visitTime = new Date(v.visit_date).getTime();
+      const patientId = v.patient_id;
       const totalCost = v.total_cost || 0;
       const amountPaid = v.amount_paid || 0;
-      const debtFromVisit = totalCost - amountPaid;
+      
+      const owedAfterThisVisit = Math.max(0, (totalCost) + (v.previous_balance || 0) - (amountPaid));
 
-      // Accumulate all-time debt for debtors table
-      const patientId = v.patient_id;
-      if (!debtorMap.has(patientId)) {
-        debtorMap.set(patientId, {
+      if (!patientDebts.has(patientId)) {
+        patientDebts.set(patientId, {
           id: patientId,
           name: v.patient ? `${v.patient.first_name} ${v.patient.last_name}` : 'Unknown Patient',
           phone: v.patient?.contact_number || 'N/A',
-          lastVisit: visitTime,
-          owed: 0
+          lastVisitTimeAllTime: 0,
+          lastVisitTimeBeforeMonth: 0,
+          owedAllTime: 0,
+          owedBeforeMonth: 0
         });
       }
-      const debtor = debtorMap.get(patientId)!;
-      debtor.owed += debtFromVisit;
-      if (visitTime > debtor.lastVisit) debtor.lastVisit = visitTime;
 
-      // Process strictly within the selected month
+      const pState = patientDebts.get(patientId)!;
+
+      // Track all-time latest visit for exact CURRENT debt
+      if (visitTime >= pState.lastVisitTimeAllTime) {
+        pState.lastVisitTimeAllTime = visitTime;
+        pState.owedAllTime = owedAfterThisVisit;
+      }
+
+      // Track the latest visit BEFORE the selected month for PREVIOUS debt
+      if (visitTime < startOfMonth) {
+        if (visitTime >= pState.lastVisitTimeBeforeMonth) {
+          pState.lastVisitTimeBeforeMonth = visitTime;
+          pState.owedBeforeMonth = owedAfterThisVisit;
+        }
+      }
+
+      // Process strictly within the selected month for revenue metrics
       if (visitTime >= startOfMonth && visitTime <= endOfMonth) {
+        totalMonthlyRevenue += totalCost;
+        totalCollected += amountPaid;
+
         // Daily
         const day = new Date(v.visit_date).getDate();
         dailyMap.set(day, dailyMap.get(day)! + totalCost);
@@ -91,10 +118,12 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       revenue: rev
     }));
 
+    const COLORS = ['#C9A84C', '#4F9CF9', '#10B981', '#F59E0B', '#A87E30', '#8A8A9A'];
+    let colorIndex = 0;
     const procedureData = Array.from(procedureMap.entries())
       .map(([name, val]) => {
         const matchedService = services?.find(s => s.name === name);
-        const color = matchedService?.color || '#8A8A9A';
+        const color = matchedService?.color || COLORS[colorIndex++ % COLORS.length];
         return {
           name: name.length > 25 ? name.slice(0,25) + '...' : name,
           value: val,
@@ -104,20 +133,43 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       .filter(p => p.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    const debtors = Array.from(debtorMap.values())
-      .filter(d => d.owed > 0)
-      .sort((a, b) => b.owed - a.owed)
+    let previousBalance = 0;
+    let totalOutstandingBalance = 0;
+
+    // Calculate totals explicitly first
+    Array.from(patientDebts.values()).forEach(d => {
+      previousBalance += d.owedBeforeMonth;
+      if (d.owedAllTime > 0) {
+        totalOutstandingBalance += d.owedAllTime;
+      }
+    });
+
+    const debtors = Array.from(patientDebts.values())
+      .filter(d => d.owedAllTime > 0)
+      .sort((a, b) => b.owedAllTime - a.owedAllTime)
       .map(d => ({
-        ...d,
-        lastVisit: new Date(d.lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+        lastVisit: new Date(d.lastVisitTimeAllTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        owed: d.owedAllTime
       }));
+
+    const currentMonthBalance = totalOutstandingBalance - previousBalance;
 
     return {
       realDailyData: dailyData,
       realProcedureData: procedureData,
-      realDebtors: debtors
+      realDebtors: debtors,
+      stats: {
+        previousBalance,
+        currentMonthBalance,
+        totalOutstandingBalance,
+        totalMonthlyRevenue,
+        totalCollected
+      }
     };
-  }, [visits, selectedMonth]);
+  }, [visits, selectedMonth, services]);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -133,51 +185,10 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     return Array.from(months).sort().reverse();
   }, [visits]);
 
-  const stats = useMemo(() => {
-    const [yearStr, monthStr] = selectedMonth.split('-');
-    const year = parseInt(yearStr);
-    const month = parseInt(monthStr) - 1; // 0-indexed month
-
-    const startOfMonth = new Date(year, month, 1).getTime();
-    const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
-
-    let previousBalance = 0;
-    let currentMonthBalance = 0;
-    let totalMonthlyRevenue = 0;
-    let totalCollected = 0;
-
-    visits.forEach(v => {
-      if (!v.visit_date) return;
-      const visitTime = new Date(v.visit_date).getTime();
-      const totalCost = v.total_cost || 0;
-      const amountPaid = v.amount_paid || 0;
-      const debtFromVisit = totalCost - amountPaid;
-
-      if (visitTime < startOfMonth) {
-        previousBalance += debtFromVisit;
-      } else if (visitTime >= startOfMonth && visitTime <= endOfMonth) {
-        currentMonthBalance += debtFromVisit;
-        totalMonthlyRevenue += totalCost;
-        totalCollected += amountPaid;
-      }
-    });
-
-    // Ensure debts don't go negative if overpaid (though unlikely in this system)
-    previousBalance = Math.max(0, previousBalance);
-    currentMonthBalance = Math.max(0, currentMonthBalance);
-
-    const totalOutstandingBalance = previousBalance + currentMonthBalance;
-
-    return {
-      previousBalance,
-      currentMonthBalance,
-      totalOutstandingBalance,
-      totalMonthlyRevenue,
-      totalCollected
-    };
-  }, [visits, selectedMonth]);
-
-  const formatCurrency = (val: number) => `${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP`;
+  const formatCurrency = (val: number) => {
+    const isNegative = val < 0;
+    return `${isNegative ? '-' : ''}${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP`;
+  };
 
   return (
     <div className="space-y-4 mb-6">
@@ -242,7 +253,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
             <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
             <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
               <AlertCircle className="w-3 h-3 text-orange-400/70" />
-              Current M. Balance
+              Net Debt Change
             </p>
             <p className="text-lg font-bold text-orange-400">{formatCurrency(stats.currentMonthBalance)}</p>
           </div>
@@ -317,7 +328,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
                     align="center"
                     iconType="circle"
                     wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value, entry: any) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
+                    formatter={(value) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
                   />
                 </PieChart>
               ) : (
