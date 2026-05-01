@@ -9,13 +9,19 @@ export default async function DoctorAnalyticsPage() {
   const cookieStore = await cookies();
   const doctorId = cookieStore.get('user_id')?.value;
 
-  const { data: visitsRes } = await supabaseAdmin
-    .from('visits')
-    .select('*, patient:patients(*)')
-    .eq('doctor_id', doctorId!)
-    .order('visit_date', { ascending: false });
+  const [{ data: visitsRes }, { data: servicesRes }] = await Promise.all([
+    supabaseAdmin
+      .from('visits')
+      .select('*, patient:patients(*)')
+      .eq('doctor_id', doctorId!)
+      .order('visit_date', { ascending: false }),
+    supabaseAdmin
+      .from('services')
+      .select('*')
+  ]);
 
   const visits = visitsRes || [];
+  const services = servicesRes || [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -35,7 +41,7 @@ export default async function DoctorAnalyticsPage() {
         </div>
       </div>
 
-      <FinancialAnalytics visits={visits as any} />
+      <FinancialAnalytics visits={visits as any} services={services as any} />
     </div>
   );
 }

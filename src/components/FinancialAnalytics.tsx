@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User } from 'lucide-react';
-import { Visit } from '@/lib/types';
+import { Visit, Service } from '@/lib/types';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -10,9 +10,10 @@ import {
 
 interface FinancialAnalyticsProps {
   visits: Visit[];
+  services: Service[];
 }
 
-export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) {
+export default function FinancialAnalytics({ visits, services }: FinancialAnalyticsProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -71,13 +72,16 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
           if (procNames.length > 0) {
             const distributedCost = totalCost / procNames.length;
             procNames.forEach(proc => {
-              procedureMap.set(proc, (procedureMap.get(proc) || 0) + distributedCost);
+              // Exact match or fallback to 'Other'
+              const matchedService = services?.find(s => s.name.toLowerCase() === proc.toLowerCase());
+              const finalName = matchedService ? matchedService.name : 'Other';
+              procedureMap.set(finalName, (procedureMap.get(finalName) || 0) + distributedCost);
             });
           } else {
-            procedureMap.set('General / Checkup', (procedureMap.get('General / Checkup') || 0) + totalCost);
+            procedureMap.set('Other', (procedureMap.get('Other') || 0) + totalCost);
           }
         } else {
-          procedureMap.set('General / Checkup', (procedureMap.get('General / Checkup') || 0) + totalCost);
+          procedureMap.set('Other', (procedureMap.get('Other') || 0) + totalCost);
         }
       }
     });
@@ -87,14 +91,16 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
       revenue: rev
     }));
 
-    const COLORS = ['#C9A84C', '#4F9CF9', '#10B981', '#F59E0B', '#A87E30', '#8A8A9A'];
-    let colorIndex = 0;
     const procedureData = Array.from(procedureMap.entries())
-      .map(([name, val]) => ({
-        name: name.length > 25 ? name.slice(0,25) + '...' : name,
-        value: val,
-        color: COLORS[colorIndex++ % COLORS.length]
-      }))
+      .map(([name, val]) => {
+        const matchedService = services?.find(s => s.name === name);
+        const color = matchedService?.color || '#8A8A9A';
+        return {
+          name: name.length > 25 ? name.slice(0,25) + '...' : name,
+          value: val,
+          color: color
+        };
+      })
       .filter(p => p.value > 0)
       .sort((a, b) => b.value - a.value);
 
@@ -290,10 +296,10 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
                   <Pie
                     data={realProcedureData}
                     cx="50%"
-                    cy="40%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    cy="45%"
+                    innerRadius={70}
+                    outerRadius={95}
+                    paddingAngle={3}
                     dataKey="value"
                     stroke="none"
                   >
@@ -307,10 +313,10 @@ export default function FinancialAnalytics({ visits }: FinancialAnalyticsProps) 
                     formatter={(value: number) => `${formatCurrency(value)}`}
                   />
                   <Legend 
-                    verticalAlign="bottom" 
-                    height={36} 
+                    verticalAlign="bottom"
+                    align="center"
                     iconType="circle"
-                    wrapperStyle={{ marginTop: '-25px' }}
+                    wrapperStyle={{ paddingTop: '20px' }}
                     formatter={(value, entry: any) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
                   />
                 </PieChart>
