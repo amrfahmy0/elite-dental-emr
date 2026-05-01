@@ -99,16 +99,13 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
           if (procNames.length > 0) {
             const distributedCost = totalCost / procNames.length;
             procNames.forEach(proc => {
-              // Exact match or fallback to 'Other'
+              // Only include recognized services
               const matchedService = services?.find(s => s.name.toLowerCase() === proc.toLowerCase());
-              const finalName = matchedService ? matchedService.name : 'Other';
-              procedureMap.set(finalName, (procedureMap.get(finalName) || 0) + distributedCost);
+              if (matchedService) {
+                procedureMap.set(matchedService.name, (procedureMap.get(matchedService.name) || 0) + distributedCost);
+              }
             });
-          } else {
-            procedureMap.set('Other', (procedureMap.get('Other') || 0) + totalCost);
           }
-        } else {
-          procedureMap.set('Other', (procedureMap.get('Other') || 0) + totalCost);
         }
       }
     });
@@ -118,12 +115,14 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       revenue: rev
     }));
 
-    const COLORS = ['#C9A84C', '#4F9CF9', '#10B981', '#F59E0B', '#A87E30', '#8A8A9A'];
+    // Vibrant distinct color palette to guarantee differentiation
+    const COLORS = ['#4F9CF9', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308', '#F43F5E', '#14B8A6', '#8B5CF6', '#C9A84C', '#6366F1'];
     let colorIndex = 0;
+    
     const procedureData = Array.from(procedureMap.entries())
       .map(([name, val]) => {
-        const matchedService = services?.find(s => s.name === name);
-        const color = matchedService?.color || COLORS[colorIndex++ % COLORS.length];
+        // Enforce a distinct color for every procedure slice to ensure they are visually separate
+        const color = COLORS[colorIndex++ % COLORS.length];
         return {
           name: name.length > 25 ? name.slice(0,25) + '...' : name,
           value: val,
