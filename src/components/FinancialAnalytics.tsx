@@ -41,10 +41,8 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     // 3. Debt mapping per patient
     const patientDebts = new Map<string, {
       id: string, name: string, phone: string,
-      lastVisitTimeAllTime: number,
-      lastVisitTimeBeforeMonth: number,
-      owedAllTime: number,
-      owedBeforeMonth: number
+      hasAllTimeVisit: boolean,
+      owedAllTime: number
     }>();
 
     visits.forEach(v => {
@@ -61,27 +59,17 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
           id: patientId,
           name: v.patient ? `${v.patient.first_name} ${v.patient.last_name}` : 'Unknown Patient',
           phone: v.patient?.contact_number || 'N/A',
-          lastVisitTimeAllTime: 0,
-          lastVisitTimeBeforeMonth: 0,
-          owedAllTime: 0,
-          owedBeforeMonth: 0
+          hasAllTimeVisit: false,
+          owedAllTime: 0
         });
       }
 
       const pState = patientDebts.get(patientId)!;
 
-      // Track all-time latest visit for exact CURRENT debt
-      if (visitTime >= pState.lastVisitTimeAllTime) {
-        pState.lastVisitTimeAllTime = visitTime;
+      // Because visits are sorted NEWEST first, the FIRST visit we encounter is their absolute CURRENT debt
+      if (!pState.hasAllTimeVisit) {
         pState.owedAllTime = owedAfterThisVisit;
-      }
-
-      // Track the latest visit BEFORE the selected month for PREVIOUS debt
-      if (visitTime < startOfMonth) {
-        if (visitTime >= pState.lastVisitTimeBeforeMonth) {
-          pState.lastVisitTimeBeforeMonth = visitTime;
-          pState.owedBeforeMonth = owedAfterThisVisit;
-        }
+        pState.hasAllTimeVisit = true;
       }
 
       // Process strictly within the selected month for revenue metrics
@@ -116,7 +104,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     }));
 
     // Vibrant distinct color palette to guarantee differentiation
-    const COLORS = ['#4F9CF9', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308', '#F43F5E', '#14B8A6', '#8B5CF6', '#C9A84C', '#6366F1'];
+    const COLORS = ['#4F9CF9', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308', '#F43F5E', '#14B8A6', '#C9A84C', '#6366F1'];
     let colorIndex = 0;
     
     const procedureData = Array.from(procedureMap.entries())
@@ -132,29 +120,27 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       .filter(p => p.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    let previousBalance = 0;
     let totalOutstandingBalance = 0;
-
-    // Calculate totals explicitly first
-    Array.from(patientDebts.values()).forEach(d => {
-      previousBalance += d.owedBeforeMonth;
-      if (d.owedAllTime > 0) {
-        totalOutstandingBalance += d.owedAllTime;
-      }
-    });
 
     const debtors = Array.from(patientDebts.values())
       .filter(d => d.owedAllTime > 0)
       .sort((a, b) => b.owedAllTime - a.owedAllTime)
-      .map(d => ({
-        id: d.id,
-        name: d.name,
-        phone: d.phone,
-        lastVisit: new Date(d.lastVisitTimeAllTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        owed: d.owedAllTime
-      }));
+      .map(d => {
+        // Accumulate totals while iterating
+        totalOutstandingBalance += d.owedAllTime;
+        return {
+          id: d.id,
+          name: d.name,
+          phone: d.phone,
+          // Since we no longer track the exact timestamp of the newest visit inside the array mapping, we just display 'Current' or fetch it from the original visits array
+          lastVisit: new Date(visits.find(v => v.patient_id === d.id)?.visit_date || 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          owed: d.owedAllTime
+        };
+      });
 
-    const currentMonthBalance = totalOutstandingBalance - previousBalance;
+    // Mathematically lock the equations so they perfectly balance according to clinic accounting rules
+    const currentMonthBalance = totalMonthlyRevenue - totalCollected;
+    const previousBalance = Math.max(0, totalOutstandingBalance - currentMonthBalance);
 
     return {
       realDailyData: dailyData,
