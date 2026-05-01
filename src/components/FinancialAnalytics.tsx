@@ -140,7 +140,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
 
     // Mathematically lock the equations so they perfectly balance according to clinic accounting rules
     const currentMonthBalance = totalMonthlyRevenue - totalCollected;
-    const previousBalance = Math.max(0, totalOutstandingBalance - currentMonthBalance);
+    const previousBalance = totalOutstandingBalance - currentMonthBalance;
 
     return {
       realDailyData: dailyData,
