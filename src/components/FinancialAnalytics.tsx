@@ -42,7 +42,9 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     const patientDebts = new Map<string, {
       id: string, name: string, phone: string,
       hasAllTimeVisit: boolean,
-      owedAllTime: number
+      hasBeforeMonthVisit: boolean,
+      owedAllTime: number,
+      owedBeforeMonth: number
     }>();
 
     visits.forEach(v => {
@@ -60,7 +62,9 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
           name: v.patient ? `${v.patient.first_name} ${v.patient.last_name}` : 'Unknown Patient',
           phone: v.patient?.contact_number || 'N/A',
           hasAllTimeVisit: false,
-          owedAllTime: 0
+          hasBeforeMonthVisit: false,
+          owedAllTime: 0,
+          owedBeforeMonth: 0
         });
       }
 
@@ -70,6 +74,12 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       if (!pState.hasAllTimeVisit) {
         pState.owedAllTime = owedAfterThisVisit;
         pState.hasAllTimeVisit = true;
+      }
+
+      // The FIRST visit we encounter that is older than startOfMonth is their TRUE previous debt
+      if (visitTime < startOfMonth && !pState.hasBeforeMonthVisit) {
+        pState.owedBeforeMonth = owedAfterThisVisit;
+        pState.hasBeforeMonthVisit = true;
       }
 
       // Process strictly within the selected month for revenue metrics
@@ -120,14 +130,10 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       .filter(p => p.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    let totalOutstandingBalance = 0;
-
     const debtors = Array.from(patientDebts.values())
       .filter(d => d.owedAllTime > 0)
       .sort((a, b) => b.owedAllTime - a.owedAllTime)
       .map(d => {
-        // Accumulate totals while iterating
-        totalOutstandingBalance += d.owedAllTime;
         return {
           id: d.id,
           name: d.name,
@@ -138,9 +144,14 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
         };
       });
 
+    let previousBalance = 0;
+    Array.from(patientDebts.values()).forEach(d => {
+      previousBalance += d.owedBeforeMonth;
+    });
+
     // Mathematically lock the equations so they perfectly balance according to clinic accounting rules
     const currentMonthBalance = totalMonthlyRevenue - totalCollected;
-    const previousBalance = totalOutstandingBalance - currentMonthBalance;
+    const totalOutstandingBalance = Math.max(0, previousBalance + currentMonthBalance);
 
     return {
       realDailyData: dailyData,
