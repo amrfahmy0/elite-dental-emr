@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
-import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info } from 'lucide-react';
+import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info, Printer } from 'lucide-react';
 
 export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toastId?: string | number; onDismiss?: () => void }) {
   const pt = visit.patient;
@@ -17,6 +17,8 @@ export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toas
   const [payment, setPayment] = useState(remaining > 0 ? remaining : 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isSuccess, setIsSuccess] = useState(false);
+
   const handlePay = async () => {
     if (payment <= 0) return;
     setIsSubmitting(true);
@@ -24,12 +26,38 @@ export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toas
     setIsSubmitting(false);
     if (!error) {
       toast.success(`Collected ${payment} EGP from ${pt.first_name}`);
-      if (toastId) toast.dismiss(toastId);
-      if (onDismiss) onDismiss();
+      setIsSuccess(true);
     } else {
       toast.error(error);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="glass-card-light p-5 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto text-center" style={{ borderColor: 'rgba(16,185,129,0.4)', background: '#0B1220' }}>
+        <CheckCircle className="w-16 h-16 text-[#10B981] mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-[#E8E8F0] mb-2">Payment Recorded Successfully</h3>
+        <p className="text-sm text-[#8A8A9A] mb-6">The invoice for {pt.first_name} {pt.last_name} has been updated.</p>
+        
+        <div className="flex gap-3">
+          <button onClick={() => {
+              if (toastId) toast.dismiss(toastId);
+              if (onDismiss) onDismiss();
+            }} 
+            className="flex-1 py-3 rounded-xl text-sm font-bold text-[#8A8A9A] transition-colors"
+            style={{ background: 'rgba(255,255,255,0.05)' }}>
+            No, Close
+          </button>
+          <button onClick={() => window.print()}
+            className="flex-1 py-3 rounded-xl text-sm font-bold text-[#070E1A] transition-colors flex items-center justify-center gap-2"
+            style={{ background: '#10B981' }}>
+            <Printer className="w-4 h-4" /> Print Invoice
+          </button>
+        </div>
+        <InvoicePrintLayout visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} />
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card-light p-4 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto" style={{ borderColor: 'rgba(201,168,76,0.4)', background: '#0B1220' }}>
@@ -179,4 +207,88 @@ export default function BillingNotifier() {
   }, []);
 
   return null;
+}
+
+export function InvoicePrintLayout({ visit }: { visit: any }) {
+  if (!visit) return null;
+  const pt = visit.patient;
+  const procedures = visit.procedure_performed ? visit.procedure_performed.split(', ') : ['General Visit'];
+  const totalCost = visit.total_cost || 0;
+  
+  return (
+    <div className="print-only hidden print:block fixed inset-0 bg-white text-black p-8 z-[200]">
+      <div className="max-w-3xl mx-auto border-2 border-gray-800 p-8 rounded-lg">
+        <div className="flex justify-between items-start border-b-2 border-gray-300 pb-6 mb-6">
+          <div>
+            <h1 className="text-3xl font-black uppercase tracking-tight text-gray-900">Elite Dental Studio</h1>
+            <p className="text-gray-600 text-sm mt-1">123 Health Ave, Medical District</p>
+            <p className="text-gray-600 text-sm">Tax ID: 987-654-321</p>
+          </div>
+          <div className="text-right">
+            <h2 className="text-xl font-bold text-gray-800 uppercase tracking-widest mb-1">Invoice</h2>
+            <p className="text-gray-600 text-sm"><strong>Date:</strong> {new Date(visit.visit_date).toLocaleDateString()}</p>
+            <p className="text-gray-600 text-sm"><strong>Invoice #:</strong> INV-{visit.id.slice(0, 8).toUpperCase()}</p>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="font-bold text-gray-800 mb-2 border-b border-gray-200 pb-1 uppercase tracking-wider text-sm">Billed To</h3>
+          <p className="text-lg font-semibold text-gray-900">{pt.first_name} {pt.last_name}</p>
+          <p className="text-gray-600 text-sm">Patient ID: {pt.patient_id}</p>
+        </div>
+
+        <table className="w-full mb-8 text-sm text-gray-900">
+          <thead>
+            <tr className="bg-gray-100 border-y border-gray-300">
+              <th className="py-2 px-3 text-left font-bold uppercase tracking-wider">Description / Service</th>
+              <th className="py-2 px-3 text-right font-bold uppercase tracking-wider">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {procedures.map((proc: string, i: number) => (
+              <tr key={i} className="border-b border-gray-100">
+                <td className="py-3 px-3">{proc}</td>
+                {i === 0 ? (
+                  <td className="py-3 px-3 text-right">{totalCost.toFixed(2)} EGP</td>
+                ) : (
+                  <td className="py-3 px-3 text-right">Included</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="flex justify-end mb-12">
+          <div className="w-64 space-y-2 text-sm text-gray-900">
+            <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-2">
+              <span>Total Cost</span>
+              <span>{totalCost.toFixed(2)} EGP</span>
+            </div>
+            {(visit.previous_balance || 0) > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Previous Balance</span>
+                <span>{visit.previous_balance.toFixed(2)} EGP</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold border-t border-gray-200 pt-2">
+              <span>Amount Paid</span>
+              <span>-{visit.amount_paid?.toFixed(2) || '0.00'} EGP</span>
+            </div>
+            <div className="flex justify-between font-black text-lg border-t-2 border-gray-800 pt-2 mt-2">
+              <span>Remaining Balance</span>
+              <span>{Math.max(0, totalCost + (visit.previous_balance || 0) - (visit.amount_paid || 0)).toFixed(2)} EGP</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-end mt-16 pt-8 border-t-2 border-gray-300 text-gray-500 text-sm">
+          <p>Thank you for trusting Elite Dental Studio.</p>
+          <div className="text-center">
+            <div className="w-48 border-b border-gray-400 mb-2 mx-auto"></div>
+            <p>Doctor&apos;s Signature / Clinic Stamp</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
