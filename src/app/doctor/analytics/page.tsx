@@ -30,7 +30,7 @@ export default async function DoctorAnalyticsPage() {
   const expenses = expensesRes || [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full px-6 space-y-6 pb-10">
       {/* Header */}
       <div className="rounded-2xl p-7 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #0F1B2E 0%, #152340 50%, #1A2D52 100%)', border: '1px solid rgba(201,168,76,0.2)' }}>
