@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User, TrendingDown, CheckCircle2, FileText, Activity, Plus } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User, TrendingDown, CheckCircle2, FileText, Activity, Plus, Paperclip, Image as ImageIcon } from 'lucide-react';
 import { Visit, Service, Expense } from '@/lib/types';
 import { addExpenseAction } from '@/app/doctor/analytics/actions';
 import {
@@ -25,6 +25,8 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
   const [localExpenses, setLocalExpenses] = useState<Expense[]>(initialExpenses);
 
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'Supplies', payee: '' });
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveExpense = async () => {
@@ -39,20 +41,25 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
       ? now.toISOString().split('T')[0]
       : `${selectedMonth}-01`;
 
-    const newExpense = {
-      expense_date: expenseDate,
-      category: expenseForm.category,
-      payee: expenseForm.payee,
-      amount: parseFloat(expenseForm.amount)
-    };
+    const formData = new FormData();
+    formData.append('expense_date', expenseDate);
+    formData.append('category', expenseForm.category);
+    formData.append('payee', expenseForm.payee);
+    formData.append('amount', expenseForm.amount);
+    
+    if (receiptFile) {
+      formData.append('receipt', receiptFile);
+    }
 
-    const { data, error } = await addExpenseAction(newExpense);
+    const { data, error } = await addExpenseAction(formData);
     
     setIsSaving(false);
     
     if (!error && data) {
       setLocalExpenses([...localExpenses, data as Expense]);
       setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
+      setReceiptFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       // Toast notification would go here in a full implementation
     } else {
       console.error("Failed to save expense:", error);
@@ -453,6 +460,16 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
                 <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Payee / Paid To</label>
                 <input type="text" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. Dental Med" value={expenseForm.payee} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
               </div>
+              <div className="flex-none">
+                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Receipt</label>
+                <div className="relative">
+                  <input type="file" accept="image/*,.pdf" ref={fileInputRef} onChange={e => setReceiptFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  <div className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${receiptFile ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-[#0B1220] text-[#8A8A9A] hover:bg-white/5 border-red-500/30'}`} style={{ borderColor: receiptFile ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)' }}>
+                    <Paperclip className="w-4 h-4" />
+                    <span className="whitespace-nowrap max-w-[80px] truncate">{receiptFile ? receiptFile.name : 'Attach'}</span>
+                  </div>
+                </div>
+              </div>
               <button onClick={handleSaveExpense} disabled={isSaving} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap disabled:opacity-50" style={{ background: '#EF4444', color: '#fff' }}>
                 {isSaving ? 'Saving...' : 'Save Expense'}
               </button>
@@ -481,7 +498,16 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
                     <tr key={exp.id} className="transition-colors hover:bg-white/[0.02]">
                       <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{new Date(exp.expense_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
                       <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#E8E8F0' }}>{exp.category}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{exp.payee}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>
+                        <div className="flex items-center gap-2">
+                          {exp.payee}
+                          {exp.receipt_url && (
+                            <a href={exp.receipt_url} target="_blank" rel="noreferrer" className="text-red-400 hover:text-red-300 transition-colors" title="View Receipt">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-xs font-bold text-right text-red-400">{formatCurrency(exp.amount)}</td>
                     </tr>
                   )) : (

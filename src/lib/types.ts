@@ -71,6 +71,7 @@ export interface Expense {
   payee: string;
   amount: number;
   doctor_id: string;
+  receipt_url?: string;
   created_at?: string;
 }
 
