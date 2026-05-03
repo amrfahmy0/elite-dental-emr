@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User } from 'lucide-react';
+import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User, TrendingDown, CheckCircle2, FileText, Activity, Plus } from 'lucide-react';
 import { Visit, Service } from '@/lib/types';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -19,7 +19,30 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const { realDailyData, realProcedureData, realDebtors, stats } = useMemo(() => {
+  const [mockExpenses, setMockExpenses] = useState([
+    { id: '1', date: '2026-05-02', category: 'Supplies', payee: 'Dental Supply Co', amount: 3500 },
+    { id: '2', date: '2026-05-05', category: 'Salaries', payee: 'Staff', amount: 15000 },
+    { id: '3', date: '2026-05-10', category: 'Lab Fees', payee: 'Elite Labs', amount: 8200 },
+    { id: '4', date: '2026-04-12', category: 'Maintenance', payee: 'FixIt Services', amount: 2000 }
+  ]);
+
+  const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'Supplies', payee: '' });
+
+  const handleSaveExpense = () => {
+    if (!expenseForm.amount || !expenseForm.category || !expenseForm.payee) return;
+    const newExpense = {
+      id: Math.random().toString(36).substr(2, 9),
+      date: `${selectedMonth}-15`, // Mocking to currently selected month
+      category: expenseForm.category,
+      payee: expenseForm.payee,
+      amount: parseFloat(expenseForm.amount)
+    };
+    setMockExpenses([...mockExpenses, newExpense]);
+    setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
+    // basic toast logic would go here
+  };
+
+  const { realDailyData, realProcedureData, realDebtors, stats, expenseData, monthExpenses } = useMemo(() => {
     const [yearStr, monthStr] = selectedMonth.split('-');
     const year = parseInt(yearStr);
     const month = parseInt(monthStr) - 1; // 0-indexed month
@@ -153,19 +176,46 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     const currentMonthBalance = totalMonthlyRevenue - totalCollected;
     const totalOutstandingBalance = Math.max(0, previousBalance + currentMonthBalance);
 
+    // Expenses Calculation
+    let totalExpenses = 0;
+    const expenseCategoryMap = new Map<string, number>();
+    
+    const currentMonthExpenses = mockExpenses.filter(e => e.date.startsWith(selectedMonth)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    currentMonthExpenses.forEach(e => {
+      totalExpenses += e.amount;
+      expenseCategoryMap.set(e.category, (expenseCategoryMap.get(e.category) || 0) + e.amount);
+    });
+
+    const EXPENSE_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#8B5CF6', '#64748B', '#A8A29E'];
+    let expColorIndex = 0;
+    const expenseChartData = Array.from(expenseCategoryMap.entries())
+      .map(([name, val]) => ({
+        name,
+        value: val,
+        color: EXPENSE_COLORS[expColorIndex++ % EXPENSE_COLORS.length]
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    const netProfit = totalCollected - totalExpenses;
+
     return {
       realDailyData: dailyData,
       realProcedureData: procedureData,
       realDebtors: debtors,
+      expenseData: expenseChartData,
+      monthExpenses: currentMonthExpenses,
       stats: {
         previousBalance,
         currentMonthBalance,
         totalOutstandingBalance,
         totalMonthlyRevenue,
-        totalCollected
+        totalCollected,
+        totalExpenses,
+        netProfit
       }
     };
-  }, [visits, selectedMonth, services]);
+  }, [visits, selectedMonth, services, mockExpenses]);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -209,58 +259,77 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
       </div>
 
       <div className="flex flex-col xl:flex-row gap-4">
-        {/* Revenue & Collected */}
-        <div className="flex-1 grid grid-cols-2 gap-4">
-          <div className="glass-card-light p-5 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
+        {/* Core P&L */}
+        <div className="flex-[1.2] grid grid-cols-2 gap-4">
+          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                <TrendingUp className="w-4 h-4" />
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <TrendingUp className="w-3.5 h-3.5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Monthly Revenue</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Monthly Revenue</p>
             </div>
-            <p className="text-2xl font-black text-white">{formatCurrency(stats.totalMonthlyRevenue)}</p>
+            <p className="text-xl font-black text-white">{formatCurrency(stats.totalMonthlyRevenue)}</p>
           </div>
           
-          <div className="glass-card-light p-5 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(79,156,249,0.2)' }}>
+          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(79,156,249,0.2)' }}>
             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
-                <Wallet className="w-4 h-4" />
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1 rounded-lg bg-blue-500/20 text-blue-400">
+                <Wallet className="w-3.5 h-3.5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Total Collected</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Total Collected</p>
             </div>
-            <p className="text-2xl font-black text-white">{formatCurrency(stats.totalCollected)}</p>
+            <p className="text-xl font-black text-white">{formatCurrency(stats.totalCollected)}</p>
+          </div>
+
+          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.2)' }}>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1 rounded-lg bg-red-500/20 text-red-400">
+                <TrendingDown className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Total Expenses</p>
+            </div>
+            <p className="text-xl font-black text-white">{formatCurrency(stats.totalExpenses)}</p>
+          </div>
+
+          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.05)' }}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1 rounded-lg bg-[#C9A84C]/20 text-[#C9A84C]">
+                <Activity className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#C9A84C' }}>Net Profit</p>
+            </div>
+            <p className="text-xl font-black text-[#C9A84C]">{formatCurrency(stats.netProfit)}</p>
           </div>
         </div>
 
         {/* Debt Metrics */}
-        <div className="flex-[1.5] grid grid-cols-3 gap-4">
-          <div className="glass-card-light p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(248,113,113,0.1)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
-              <Clock className="w-3 h-3 text-red-400/70" />
-              Previous Balance
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-4">
+          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(248,113,113,0.1)' }}>
+            <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
+              <Clock className="w-3 h-3 text-red-400/70" /> Previous Balance
             </p>
-            <p className="text-lg font-bold text-red-400">{formatCurrency(stats.previousBalance)}</p>
+            <p className="text-base font-bold text-red-400">{formatCurrency(stats.previousBalance)}</p>
           </div>
           
-          <div className="glass-card-light p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(251,146,60,0.1)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
-              <AlertCircle className="w-3 h-3 text-orange-400/70" />
-              Net Debt Change
+          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(251,146,60,0.1)' }}>
+            <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
+              <AlertCircle className="w-3 h-3 text-orange-400/70" /> Net Debt Change
             </p>
-            <p className="text-lg font-bold text-orange-400">{formatCurrency(stats.currentMonthBalance)}</p>
+            <p className="text-base font-bold text-orange-400">{formatCurrency(stats.currentMonthBalance)}</p>
           </div>
 
-          <div className="glass-card-light p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: '#EF4444' }}>
-              <DollarSign className="w-3 h-3" />
-              Total Outstanding
+          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#EF4444' }}>
+              <DollarSign className="w-3 h-3" /> Total Outstanding
             </p>
-            <p className="text-xl font-black text-red-500">{formatCurrency(stats.totalOutstandingBalance)}</p>
+            <p className="text-lg font-black text-red-500">{formatCurrency(stats.totalOutstandingBalance)}</p>
           </div>
         </div>
       </div>
@@ -330,6 +399,123 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
               ) : (
                 <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6A6A7A' }}>
                   No revenue data for this month
+                </div>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* P&L Tracking Section (Expenses) */}
+      <div className="flex flex-col lg:flex-row gap-6 mt-6">
+        
+        {/* Expense Log Form & Table (2/3 width) */}
+        <div className="flex-[2] flex flex-col gap-6">
+          <div className="glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: '#E8E8F0' }}>
+              <Plus className="w-4 h-4 text-red-400" /> Log New Expense
+            </h3>
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Amount (EGP)</label>
+                <input type="number" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. 500" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+              </div>
+              <div className="flex-1 w-full">
+                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Category</label>
+                <select className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}>
+                  <option>Supplies</option>
+                  <option>Salaries</option>
+                  <option>Lab Fees</option>
+                  <option>Maintenance</option>
+                  <option>Marketing</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div className="flex-1 w-full">
+                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Payee / Paid To</label>
+                <input type="text" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. Dental Med" value={expenseForm.payee} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
+              </div>
+              <button onClick={handleSaveExpense} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap" style={{ background: '#EF4444', color: '#fff' }}>
+                Save Expense
+              </button>
+            </div>
+          </div>
+
+          {/* Monthly Expense Table */}
+          <div className="glass-card-light rounded-2xl border overflow-hidden flex-1 flex flex-col" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+            <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#E8E8F0' }}>
+                <FileText className="w-4 h-4 text-gray-400" /> Expense Log
+              </h3>
+            </div>
+            <div className="overflow-y-auto max-h-[250px]">
+              <table className="w-full text-sm text-left">
+                <thead className="text-[10px] uppercase tracking-wider sticky top-0" style={{ background: '#0B1220', color: '#8A8A9A' }}>
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Date</th>
+                    <th className="px-4 py-3 font-semibold">Category</th>
+                    <th className="px-4 py-3 font-semibold">Payee</th>
+                    <th className="px-4 py-3 font-semibold text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.02)' }}>
+                  {monthExpenses.length > 0 ? monthExpenses.map(exp => (
+                    <tr key={exp.id} className="transition-colors hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#E8E8F0' }}>{exp.category}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{exp.payee}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-right text-red-400">{formatCurrency(exp.amount)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-xs" style={{ color: '#6A6A7A' }}>No expenses recorded this month</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Expenses by Category Chart (1/3 width) */}
+        <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col" style={{ borderColor: 'rgba(239,68,68,0.1)' }}>
+          <h3 className="text-sm font-bold mb-6 flex items-center gap-2" style={{ color: '#E8E8F0' }}>
+            <TrendingDown className="w-4 h-4 text-red-400" /> Expenses by Category
+          </h3>
+          <div className="flex-1 w-full min-h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              {expenseData.length > 0 ? (
+                <PieChart>
+                  <Pie
+                    data={expenseData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {expenseData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(239,68,68,0.2)', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${formatCurrency(value)}`}
+                  />
+                  <Legend 
+                    verticalAlign="bottom"
+                    align="center"
+                    iconType="circle"
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    formatter={(value) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
+                  />
+                </PieChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6A6A7A' }}>
+                  No expenses for this month
                 </div>
               )}
             </ResponsiveContainer>
