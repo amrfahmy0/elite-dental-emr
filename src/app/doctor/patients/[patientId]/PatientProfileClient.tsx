@@ -242,6 +242,12 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
             {visit.chief_complaint && <Detail label="Chief Complaint" value={visit.chief_complaint} />}
             {visit.medical_notes && <Detail label="Clinical Notes" value={visit.medical_notes} />}
             {visit.diagnosis && <Detail label="Diagnosis" value={visit.diagnosis} />}
+            {visit.next_visit_plan && (
+              <div className="mt-3 p-3 rounded-xl" style={{ background: 'rgba(79,156,249,0.05)', border: '1px solid rgba(79,156,249,0.2)' }}>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#4F9CF9' }}>Next Visit Plan / Follow-up</p>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: '#E8E8F0' }}>{visit.next_visit_plan}</p>
+              </div>
+            )}
             {visit.prescription && (
               <div>
                 <div className="mt-3">
@@ -611,6 +617,10 @@ export default function PatientProfileClient({ patient, visits, doctors, service
 
             <Field label="Diagnosis">
               <textarea name="diagnosis" defaultValue={editingVisit?.diagnosis || ''} rows={2} placeholder="ICD code or description…" className="input-premium resize-none" />
+            </Field>
+
+            <Field label="Next Visit Plan / Procedure">
+              <textarea name="next_visit_plan" defaultValue={editingVisit?.next_visit_plan || ''} rows={2} placeholder="Instructions for the receptionist to schedule next..." className="input-premium resize-none" />
             </Field>
 
             <div className="space-y-3">

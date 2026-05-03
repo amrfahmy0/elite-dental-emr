@@ -86,6 +86,7 @@ export interface Visit {
   medical_notes?: string;
   diagnosis?: string;
   prescription?: string;
+  next_visit_plan?: string;
   total_cost?: number;
   amount_paid?: number;
   previous_balance?: number;

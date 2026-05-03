@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
-import { Receipt, AlertTriangle, CheckCircle, Wallet } from 'lucide-react';
+import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info } from 'lucide-react';
 
 function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | number }) {
   const pt = visit.patient;
@@ -107,9 +107,31 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
           </div>
         </div>
       ) : (
-        <p className="text-xs text-center font-bold text-[#10B981] mt-4 pt-4 border-t border-white/5">
+        <p className="text-xs text-center font-bold text-[#10B981] mt-4 pt-4 border-t border-white/5 mb-4">
           Fully Paid!
         </p>
+      )}
+
+      {/* Section B: Follow-up Action */}
+      {visit.next_visit_plan && (
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Info className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Doctor&apos;s Note for Next Visit</span>
+            </div>
+            <p className="text-sm text-blue-100 font-semibold leading-snug mb-3">
+              {visit.next_visit_plan}
+            </p>
+            <a 
+              href={`/receptionist/dashboard?patientId=${pt.id}&service=${encodeURIComponent(visit.next_visit_plan)}`}
+              onClick={() => toast.dismiss(toastId)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            >
+              <Calendar className="w-4 h-4" /> Schedule Next Appointment <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
       )}
 
       <button onClick={() => toast.dismiss(toastId)} className="w-full mt-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors"
