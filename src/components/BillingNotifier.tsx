@@ -34,33 +34,36 @@ export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toas
 
   if (isSuccess) {
     return (
-      <div className="glass-card-light p-5 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto text-center" style={{ borderColor: 'rgba(16,185,129,0.4)', background: '#0B1220' }}>
-        <CheckCircle className="w-16 h-16 text-[#10B981] mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-[#E8E8F0] mb-2">Payment Recorded Successfully</h3>
-        <p className="text-sm text-[#8A8A9A] mb-6">The invoice for {pt.first_name} {pt.last_name} has been updated.</p>
-        
-        <div className="flex gap-3">
-          <button onClick={() => {
-              if (toastId) toast.dismiss(toastId);
-              if (onDismiss) onDismiss();
-            }} 
-            className="flex-1 py-3 rounded-xl text-sm font-bold text-[#8A8A9A] transition-colors"
-            style={{ background: 'rgba(255,255,255,0.05)' }}>
-            No, Close
-          </button>
-          <button onClick={() => window.print()}
-            className="flex-1 py-3 rounded-xl text-sm font-bold text-[#070E1A] transition-colors flex items-center justify-center gap-2"
-            style={{ background: '#10B981' }}>
-            <Printer className="w-4 h-4" /> Print Invoice
-          </button>
+      <>
+        <div className="glass-card-light p-5 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto text-center print:hidden" style={{ borderColor: 'rgba(16,185,129,0.4)', background: '#0B1220' }}>
+          <CheckCircle className="w-16 h-16 text-[#10B981] mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-[#E8E8F0] mb-2">Payment Recorded Successfully</h3>
+          <p className="text-sm text-[#8A8A9A] mb-6">The invoice for {pt.first_name} {pt.last_name} has been updated.</p>
+          
+          <div className="flex gap-3">
+            <button onClick={() => {
+                if (toastId) toast.dismiss(toastId);
+                if (onDismiss) onDismiss();
+              }} 
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-[#8A8A9A] transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)' }}>
+              No, Close
+            </button>
+            <button onClick={() => window.print()}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-[#070E1A] transition-colors flex items-center justify-center gap-2"
+              style={{ background: '#10B981' }}>
+              <Printer className="w-4 h-4" /> Print Invoice
+            </button>
+          </div>
         </div>
         <InvoicePrintLayout visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="glass-card-light p-4 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto" style={{ borderColor: 'rgba(201,168,76,0.4)', background: '#0B1220' }}>
+    <>
+      <div className="glass-card-light p-4 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto print:hidden" style={{ borderColor: 'rgba(201,168,76,0.4)', background: '#0B1220' }}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Receipt className="w-5 h-5 text-[#C9A84C]" />
@@ -216,8 +219,8 @@ export function InvoicePrintLayout({ visit }: { visit: any }) {
   const totalCost = visit.total_cost || 0;
   
   return (
-    <div className="print-only hidden print:block fixed inset-0 bg-white text-black p-8 z-[200]">
-      <div className="max-w-3xl mx-auto border-2 border-gray-800 p-8 rounded-lg">
+    <div className="hidden print:block print:absolute print:top-0 print:left-0 print:w-full print:m-0 print:p-8 print:bg-white print:text-black print:z-[9999]">
+      <div className="w-full print:max-w-none mx-auto border-2 border-gray-800 p-8 rounded-lg bg-white">
         <div className="flex justify-between items-start border-b-2 border-gray-300 pb-6 mb-6">
           <div>
             <h1 className="text-3xl font-black uppercase tracking-tight text-gray-900">Elite Dental Studio</h1>
