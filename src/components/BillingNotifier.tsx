@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
 import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info, Printer } from 'lucide-react';
 
-export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toastId?: string | number; onDismiss?: () => void }) {
+export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { visit: any; toastId?: string | number; onDismiss?: () => void; services?: any[] }) {
   const pt = visit.patient;
   const visitCost = visit.total_cost || 0;
   const previousBalance = visit.previous_balance || 0;
@@ -56,7 +56,7 @@ export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toas
             </button>
           </div>
         </div>
-        <InvoicePrintLayout visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} />
+        <InvoicePrintLayout visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} services={services} />
       </>
     );
   }
@@ -177,11 +177,19 @@ export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toas
         Dismiss
       </button>
     </div>
+    <InvoicePrintLayout visit={visit} services={services} />
+    </>
   );
 }
 
 export default function BillingNotifier() {
+  const [services, setServices] = useState<any[]>([]);
+
   useEffect(() => {
+    supabase.from('services').select('*').then(({ data }) => {
+      if (data) setServices(data);
+    });
+
     const channel = supabase
       .channel('billing-rt-frontdesk')
       .on(
@@ -198,7 +206,7 @@ export default function BillingNotifier() {
               audio.play().catch(() => {});
             } catch (e) {}
 
-            toast.custom((t) => <BillingInvoice visit={visit} toastId={t} />, { duration: 120000, position: 'top-center' });
+            toast.custom((t) => <BillingInvoice visit={visit} toastId={t} services={services} />, { duration: 120000, position: 'top-center' });
           }
         }
       )
@@ -212,11 +220,27 @@ export default function BillingNotifier() {
   return null;
 }
 
-export function InvoicePrintLayout({ visit }: { visit: any }) {
+export function InvoicePrintLayout({ visit, services = [] }: { visit: any, services?: any[] }) {
   if (!visit) return null;
   const pt = visit.patient;
   const procedures = visit.procedure_performed ? visit.procedure_performed.split(', ') : ['General Visit'];
   const totalCost = visit.total_cost || 0;
+  
+  let calculatedTotal = 0;
+  const itemized = procedures.map((proc: string) => {
+    const svc = services.find(s => s.name === proc);
+    const price = svc ? svc.price : 0;
+    calculatedTotal += price;
+    return { name: proc, price };
+  });
+
+  const adjustment = totalCost - calculatedTotal;
+
+  // If no services matched or everything was 0, we put the full cost on the first item
+  if (calculatedTotal === 0 && totalCost > 0 && itemized.length > 0) {
+    itemized[0].price = totalCost;
+    calculatedTotal = totalCost;
+  }
   
   return (
     <div className="hidden print:block print:absolute print:top-0 print:left-0 print:w-full print:m-0 print:p-8 print:bg-white print:text-black print:z-[9999]">
@@ -248,16 +272,20 @@ export function InvoicePrintLayout({ visit }: { visit: any }) {
             </tr>
           </thead>
           <tbody>
-            {procedures.map((proc: string, i: number) => (
+            {itemized.map((item, i) => (
               <tr key={i} className="border-b border-gray-100">
-                <td className="py-3 px-3">{proc}</td>
-                {i === 0 ? (
-                  <td className="py-3 px-3 text-right">{totalCost.toFixed(2)} EGP</td>
-                ) : (
-                  <td className="py-3 px-3 text-right">Included</td>
-                )}
+                <td className="py-3 px-3">{item.name}</td>
+                <td className="py-3 px-3 text-right">
+                  {item.price > 0 ? `${item.price.toFixed(2)} EGP` : 'Included'}
+                </td>
               </tr>
             ))}
+            {adjustment !== 0 && totalCost !== 0 && calculatedTotal !== totalCost && (
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="py-3 px-3 italic">{adjustment < 0 ? 'Discount / Adjustment' : 'Additional Charge / Adjustment'}</td>
+                <td className="py-3 px-3 text-right italic">{adjustment > 0 ? '+' : ''}{adjustment.toFixed(2)} EGP</td>
+              </tr>
+            )}
           </tbody>
         </table>
 

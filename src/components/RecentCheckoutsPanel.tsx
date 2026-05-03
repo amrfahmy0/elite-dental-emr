@@ -10,8 +10,13 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
   const [visits, setVisits] = useState(initialVisits);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);
   const [printVisit, setPrintVisit] = useState<any | null>(null);
+  const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
+    supabase.from('services').select('*').then(({ data }) => {
+      if (data) setServices(data);
+    });
+
     const channel = supabase
       .channel('recent-checkouts')
       .on(
@@ -114,7 +119,7 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
         </div>
       )}
       {/* Hidden print layout renderer for quick printing */}
-      {printVisit && <InvoicePrintLayout visit={printVisit} />}
+      {printVisit && <InvoicePrintLayout visit={printVisit} services={services} />}
     </div>
   );
 }
