@@ -23,7 +23,6 @@ export default async function DoctorAnalyticsPage() {
       .select('*')
       .eq('doctor_id', doctorId!)
       .order('expense_date', { ascending: false })
-      .catch(() => ({ data: [] })) // Graceful fail if table not created yet
   ]);
 
   const visits = visitsRes || [];
