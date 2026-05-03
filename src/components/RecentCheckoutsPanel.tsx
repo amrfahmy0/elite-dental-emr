@@ -54,7 +54,8 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
         {visits.map((visit) => {
           const pt = visit.patient;
           const remaining = (visit.total_cost || 0) + (visit.previous_balance || 0) - (visit.amount_paid || 0);
-          const needsAttention = remaining > 0 || visit.next_visit_plan;
+          // If they've paid anything (even partial), or if there's no remaining balance, it's considered 'processed'
+          const needsAttention = remaining > 0 && (visit.amount_paid || 0) === 0;
 
           return (
             <button
