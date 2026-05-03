@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
 import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info, Printer } from 'lucide-react';
 
-export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { visit: any; toastId?: string | number; onDismiss?: () => void; services?: any[] }) {
+export function BillingInvoice({ visit, toastId, onDismiss, services = [], setPrintVisit }: { visit: any; toastId?: string | number; onDismiss?: () => void; services?: any[]; setPrintVisit?: (v: any) => void }) {
   const pt = visit.patient;
   const visitCost = visit.total_cost || 0;
   const previousBalance = visit.previous_balance || 0;
@@ -32,6 +32,12 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
     }
   };
 
+  useEffect(() => {
+    if (isSuccess && setPrintVisit) {
+      setPrintVisit({...visit, amount_paid: (visit.amount_paid || 0) + payment});
+    }
+  }, [isSuccess, payment, setPrintVisit, visit]);
+
   if (isSuccess) {
     return (
       <>
@@ -56,7 +62,6 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
             </button>
           </div>
         </div>
-        <InvoicePrintLayout visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} services={services} />
       </>
     );
   }
@@ -177,13 +182,13 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
         Dismiss
       </button>
     </div>
-    <InvoicePrintLayout visit={visit} services={services} />
     </>
   );
 }
 
 export default function BillingNotifier() {
   const [services, setServices] = useState<any[]>([]);
+  const [printVisit, setPrintVisit] = useState<any | null>(null);
 
   useEffect(() => {
     supabase.from('services').select('*').then(({ data }) => {
@@ -206,7 +211,7 @@ export default function BillingNotifier() {
               audio.play().catch(() => {});
             } catch (e) {}
 
-            toast.custom((t) => <BillingInvoice visit={visit} toastId={t} services={services} />, { duration: 120000, position: 'top-center' });
+            toast.custom((t) => <BillingInvoice visit={visit} toastId={t} services={services} setPrintVisit={setPrintVisit} />, { duration: 120000, position: 'top-center' });
           }
         }
       )
@@ -217,7 +222,7 @@ export default function BillingNotifier() {
     };
   }, []);
 
-  return null;
+  return printVisit ? <InvoicePrintLayout visit={printVisit} services={services} /> : null;
 }
 
 export function InvoicePrintLayout({ visit, services = [] }: { visit: any, services?: any[] }) {
@@ -243,7 +248,7 @@ export function InvoicePrintLayout({ visit, services = [] }: { visit: any, servi
   }
   
   return (
-    <div className="hidden print:block print:absolute print:top-0 print:left-0 print:w-full print:m-0 print:p-8 print:bg-white print:text-black print:z-[9999]">
+    <div className="hidden print:block print:fixed print:inset-0 print:w-screen print:min-h-screen print:m-0 print:p-8 print:bg-white print:text-black print:z-[9999]">
       <div className="w-full print:max-w-none mx-auto border-2 border-gray-800 p-8 rounded-lg bg-white">
         <div className="flex justify-between items-start border-b-2 border-gray-300 pb-6 mb-6">
           <div>

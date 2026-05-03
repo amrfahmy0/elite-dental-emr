@@ -178,4 +178,8 @@ body {
     size: A4;
     margin: 15mm;
   }
+  
+  [data-sonner-toaster], [data-sonner-toast] {
+    display: none !important;
+  }
 }
