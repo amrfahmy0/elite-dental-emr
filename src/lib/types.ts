@@ -64,6 +64,16 @@ export interface Attachment {
   created_at: string;
 }
 
+export interface Expense {
+  id: string;
+  expense_date: string;
+  category: string;
+  payee: string;
+  amount: number;
+  doctor_id: string;
+  created_at?: string;
+}
+
 export interface Visit {
   id: string;
   patient_id: string;

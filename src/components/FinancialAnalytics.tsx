@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User, TrendingDown, CheckCircle2, FileText, Activity, Plus } from 'lucide-react';
-import { Visit, Service } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { Visit, Service, Expense } from '@/lib/types';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -11,35 +12,53 @@ import {
 interface FinancialAnalyticsProps {
   visits: Visit[];
   services: Service[];
+  expenses: Expense[];
+  doctorId: string;
 }
 
-export default function FinancialAnalytics({ visits, services }: FinancialAnalyticsProps) {
+export default function FinancialAnalytics({ visits, services, expenses: initialExpenses, doctorId }: FinancialAnalyticsProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const [mockExpenses, setMockExpenses] = useState([
-    { id: '1', date: '2026-05-02', category: 'Supplies', payee: 'Dental Supply Co', amount: 3500 },
-    { id: '2', date: '2026-05-05', category: 'Salaries', payee: 'Staff', amount: 15000 },
-    { id: '3', date: '2026-05-10', category: 'Lab Fees', payee: 'Elite Labs', amount: 8200 },
-    { id: '4', date: '2026-04-12', category: 'Maintenance', payee: 'FixIt Services', amount: 2000 }
-  ]);
+  const [localExpenses, setLocalExpenses] = useState<Expense[]>(initialExpenses);
 
   const [expenseForm, setExpenseForm] = useState({ amount: '', category: 'Supplies', payee: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveExpense = () => {
-    if (!expenseForm.amount || !expenseForm.category || !expenseForm.payee) return;
+  const handleSaveExpense = async () => {
+    if (!expenseForm.amount || !expenseForm.category || !expenseForm.payee || isSaving) return;
+    setIsSaving(true);
+
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // If the user selected the current month, log it as today. Otherwise, log it as the 1st of the historical month.
+    const expenseDate = selectedMonth === currentMonthStr 
+      ? now.toISOString().split('T')[0]
+      : `${selectedMonth}-01`;
+
     const newExpense = {
-      id: Math.random().toString(36).substr(2, 9),
-      date: `${selectedMonth}-15`, // Mocking to currently selected month
+      expense_date: expenseDate,
       category: expenseForm.category,
       payee: expenseForm.payee,
-      amount: parseFloat(expenseForm.amount)
+      amount: parseFloat(expenseForm.amount),
+      doctor_id: doctorId
     };
-    setMockExpenses([...mockExpenses, newExpense]);
-    setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
-    // basic toast logic would go here
+
+    const { data, error } = await supabase.from('expenses').insert(newExpense).select();
+    
+    setIsSaving(false);
+    
+    if (!error && data) {
+      setLocalExpenses([...localExpenses, data[0] as Expense]);
+      setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
+      // Toast notification would go here in a full implementation
+    } else {
+      console.error("Failed to save expense:", error);
+      alert("Please ensure the 'expenses' table exists in Supabase. Check the console for errors.");
+    }
   };
 
   const { realDailyData, realProcedureData, realDebtors, stats, expenseData, monthExpenses } = useMemo(() => {
@@ -180,7 +199,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
     let totalExpenses = 0;
     const expenseCategoryMap = new Map<string, number>();
     
-    const currentMonthExpenses = mockExpenses.filter(e => e.date.startsWith(selectedMonth)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const currentMonthExpenses = localExpenses.filter(e => e.expense_date && e.expense_date.startsWith(selectedMonth)).sort((a, b) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime());
 
     currentMonthExpenses.forEach(e => {
       totalExpenses += e.amount;
@@ -215,7 +234,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
         netProfit
       }
     };
-  }, [visits, selectedMonth, services, mockExpenses]);
+  }, [visits, selectedMonth, services, localExpenses]);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -435,8 +454,8 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
                 <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Payee / Paid To</label>
                 <input type="text" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. Dental Med" value={expenseForm.payee} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
               </div>
-              <button onClick={handleSaveExpense} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap" style={{ background: '#EF4444', color: '#fff' }}>
-                Save Expense
+              <button onClick={handleSaveExpense} disabled={isSaving} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap disabled:opacity-50" style={{ background: '#EF4444', color: '#fff' }}>
+                {isSaving ? 'Saving...' : 'Save Expense'}
               </button>
             </div>
           </div>
@@ -461,7 +480,7 @@ export default function FinancialAnalytics({ visits, services }: FinancialAnalyt
                 <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.02)' }}>
                   {monthExpenses.length > 0 ? monthExpenses.map(exp => (
                     <tr key={exp.id} className="transition-colors hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{new Date(exp.expense_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
                       <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#E8E8F0' }}>{exp.category}</td>
                       <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{exp.payee}</td>
                       <td className="px-4 py-3 text-xs font-bold text-right text-red-400">{formatCurrency(exp.amount)}</td>
