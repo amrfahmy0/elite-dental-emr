@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 import InteractiveCalendar from '@/components/InteractiveCalendar';
 import QueuePanel from '@/components/QueuePanel';
+import RecentCheckoutsPanel from '@/components/RecentCheckoutsPanel';
 import { CalendarDays, Users, Clock, CheckCircle, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,17 +13,19 @@ export default async function ReceptionistDashboard() {
   const userId = cookieStore.get('user_id')?.value;
 
   // Fetch all data in parallel
-  const [apptsRes, servicesRes, patientsRes, doctorsRes] = await Promise.all([
+  const [apptsRes, servicesRes, patientsRes, doctorsRes, visitsRes] = await Promise.all([
     supabaseAdmin.from('appointments').select(`*, patient:patients(*), doctor:users(*), service:services(*)`).order('start_time', { ascending: true }),
     supabaseAdmin.from('services').select('*').order('duration_minutes', { ascending: true }),
     supabaseAdmin.from('patients').select('*').order('created_at', { ascending: false }),
     supabaseAdmin.from('users').select('*').eq('role', 'DOCTOR'),
+    supabaseAdmin.from('visits').select('*, patient:patients(*)').order('visit_date', { ascending: false }).limit(5),
   ]);
 
   const appointments = (apptsRes.data || []).filter(a => a.status !== 'CANCELLED');
   const services = servicesRes.data || [];
   const patients = patientsRes.data || [];
   const doctors = doctorsRes.data || [];
+  const recentVisits = visitsRes.data || [];
 
   const now = new Date();
   const cairoTodayString = now.toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' });
@@ -83,10 +86,16 @@ export default async function ReceptionistDashboard() {
           />
         </div>
 
-        {/* Queue Panel — right sidebar */}
-        <div className="w-[420px] shrink-0 overflow-y-auto rounded-2xl p-4"
-          style={{ background: 'rgba(7,14,26,0.7)', border: '1px solid rgba(201,168,76,0.1)' }}>
-          <QueuePanel initialQueue={todayAppts as any} role="RECEPTIONIST" />
+        {/* Sidebar: Queue + Recent Checkouts */}
+        <div className="w-[420px] shrink-0 flex flex-col gap-5 overflow-hidden">
+          <div className="flex-1 overflow-y-auto rounded-2xl p-4"
+            style={{ background: 'rgba(7,14,26,0.7)', border: '1px solid rgba(201,168,76,0.1)' }}>
+            <QueuePanel initialQueue={todayAppts as any} role="RECEPTIONIST" />
+          </div>
+          <div className="h-[35%] min-h-[250px] overflow-hidden rounded-2xl p-4"
+            style={{ background: 'rgba(7,14,26,0.7)', border: '1px solid rgba(201,168,76,0.1)' }}>
+            <RecentCheckoutsPanel initialVisits={recentVisits} />
+          </div>
         </div>
       </div>
     </div>

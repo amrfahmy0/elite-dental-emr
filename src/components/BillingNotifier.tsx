@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
 import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info } from 'lucide-react';
 
-function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | number }) {
+export function BillingInvoice({ visit, toastId, onDismiss }: { visit: any; toastId?: string | number; onDismiss?: () => void }) {
   const pt = visit.patient;
   const visitCost = visit.total_cost || 0;
   const previousBalance = visit.previous_balance || 0;
@@ -24,7 +24,8 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
     setIsSubmitting(false);
     if (!error) {
       toast.success(`Collected ${payment} EGP from ${pt.first_name}`);
-      toast.dismiss(toastId);
+      if (toastId) toast.dismiss(toastId);
+      if (onDismiss) onDismiss();
     } else {
       toast.error(error);
     }
@@ -125,7 +126,10 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
             </p>
             <a 
               href={`/receptionist/dashboard?patientId=${pt.id}&service=${encodeURIComponent(visit.next_visit_plan)}`}
-              onClick={() => toast.dismiss(toastId)}
+              onClick={() => {
+                if (toastId) toast.dismiss(toastId);
+                if (onDismiss) onDismiss();
+              }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors"
             >
               <Calendar className="w-4 h-4" /> Schedule Next Appointment <ArrowRight className="w-4 h-4" />
@@ -134,7 +138,10 @@ function BillingInvoice({ visit, toastId }: { visit: any; toastId: string | numb
         </div>
       )}
 
-      <button onClick={() => toast.dismiss(toastId)} className="w-full mt-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors"
+      <button onClick={() => {
+        if (toastId) toast.dismiss(toastId);
+        if (onDismiss) onDismiss();
+      }} className="w-full mt-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors"
         style={{ background: 'rgba(255,255,255,0.05)', color: '#8A8A9A' }}>
         Dismiss
       </button>
