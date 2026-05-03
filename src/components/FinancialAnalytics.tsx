@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { DollarSign, TrendingUp, AlertCircle, Clock, Wallet, Phone, Calendar as CalendarIcon, User, TrendingDown, CheckCircle2, FileText, Activity, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { Visit, Service, Expense } from '@/lib/types';
+import { addExpenseAction } from '@/app/doctor/analytics/actions';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -43,21 +43,20 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
       expense_date: expenseDate,
       category: expenseForm.category,
       payee: expenseForm.payee,
-      amount: parseFloat(expenseForm.amount),
-      doctor_id: doctorId
+      amount: parseFloat(expenseForm.amount)
     };
 
-    const { data, error } = await supabase.from('expenses').insert(newExpense).select();
+    const { data, error } = await addExpenseAction(newExpense);
     
     setIsSaving(false);
     
     if (!error && data) {
-      setLocalExpenses([...localExpenses, data[0] as Expense]);
+      setLocalExpenses([...localExpenses, data as Expense]);
       setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
       // Toast notification would go here in a full implementation
     } else {
       console.error("Failed to save expense:", error);
-      alert("Please ensure the 'expenses' table exists in Supabase. Check the console for errors.");
+      alert(`Failed to save expense: ${error}`);
     }
   };
 
