@@ -116,7 +116,8 @@ export default function PrescriptionPrint({ visit, patient }: PrescriptionPrintP
      * and every other layout element is hidden via print:hidden in the layouts.
      */
     <div
-      className="hidden print:block print:fixed print:inset-0 print:w-full print:h-full print:bg-white print:text-black print:z-[99999] print:overflow-hidden"
+      className="print:block print:fixed print:inset-0 print:w-full print:h-full print:bg-white print:text-black print:z-[99999] print:overflow-hidden"
+      style={{ display: 'none' }}
       aria-hidden="true"
     >
       {/* ── Full-page wrapper ── */}

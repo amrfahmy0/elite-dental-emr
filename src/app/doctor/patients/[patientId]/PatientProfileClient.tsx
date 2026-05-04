@@ -135,7 +135,7 @@ function FileViewerModal({ attachment, onClose }: { attachment: Attachment; onCl
 
 
 // ─── Visit Timeline Item ──────────────────────────────────────────────────────
-function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit & { doctor: AppUser; attachments: Attachment[] }; patient: Patient; onEdit: () => void; onDelete: () => void }) {
+function VisitTimelineItem({ visit, patient, onEdit, onDelete, onPrint }: { visit: Visit & { doctor: AppUser; attachments: Attachment[] }; patient: Patient; onEdit: () => void; onDelete: () => void; onPrint: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
   const thisVisitBalance = (visit.total_cost || 0) - (visit.amount_paid || 0);
@@ -225,12 +225,11 @@ function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit 
                     })()}
                   </ul>
                 </div>
-                <button onClick={() => window.print()}
+                <button onClick={() => onPrint()}
                   className="mt-2 flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all hover:scale-105"
                   style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }}>
                   <Printer className="w-3.5 h-3.5" /> Print Prescription
                 </button>
-                <PrescriptionPrint visit={visit} patient={patient} />
               </div>
             )}
 
@@ -342,6 +341,7 @@ export default function PatientProfileClient({ patient, visits, doctors, service
   const [isDragging, setIsDragging] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [prescriptionList, setPrescriptionList] = useState<{name: string, amount: string, frequency: string, duration: string}[]>([]);
+  const [printVisit, setPrintVisit] = useState<(Visit & { doctor: AppUser }) | null>(null);
   const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
 
   // Calculate total outstanding balance by looking at the most recent visit
@@ -781,10 +781,13 @@ export default function PatientProfileClient({ patient, visits, doctors, service
           </div>
         ) : (
           <div>
-            {visits.map(v => <VisitTimelineItem key={v.id} visit={v} patient={patient} onEdit={() => openEditForm(v)} onDelete={() => handleDeleteVisit(v.id)} />)}
+            {visits.map(v => <VisitTimelineItem key={v.id} visit={v} patient={patient} onEdit={() => openEditForm(v)} onDelete={() => handleDeleteVisit(v.id)} onPrint={() => { setPrintVisit(v); setTimeout(() => window.print(), 50); }} />)}
           </div>
         )}
       </div>
+
+      {/* Always-mounted at root so it is in the DOM before window.print() fires */}
+      {printVisit && <PrescriptionPrint visit={printVisit} patient={patient} />}
     </div>
   );
 }
