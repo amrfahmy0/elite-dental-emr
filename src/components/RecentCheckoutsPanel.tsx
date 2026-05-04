@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVisitDetailsAction } from '@/app/actions';
-import { BillingInvoice, InvoicePrintLayout } from './BillingNotifier';
-import { Clock, CheckCircle, AlertCircle, X, Printer } from 'lucide-react';
+import { BillingInvoice } from './BillingNotifier';
+import InvoicePrint from './InvoicePrint';
+import { Clock, CheckCircle, AlertCircle, Printer } from 'lucide-react';
 
 export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits: any[] }) {
   const [visits, setVisits] = useState(initialVisits);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);
-  const [printVisit, setPrintVisit] = useState<any | null>(null);
   const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
@@ -87,20 +87,18 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
                 ) : (
                   <CheckCircle className="w-4 h-4 text-emerald-500" />
                 )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPrintVisit(visit);
-                    setTimeout(() => {
-                      window.print();
-                      setPrintVisit(null);
-                    }, 100);
-                  }}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 transition-all text-[#C9A84C]"
-                  title="Print Invoice"
-                >
-                  <Printer className="w-4 h-4" />
-                </button>
+                <InvoicePrint
+                  visit={visit}
+                  services={services}
+                  trigger={
+                    <button
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 transition-all text-[#C9A84C]"
+                      title="Print Invoice"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  }
+                />
               </div>
             </button>
           );
@@ -118,8 +116,6 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
           </div>
         </div>
       )}
-      {/* Hidden print layout renderer for quick printing */}
-      {printVisit && <InvoicePrintLayout visit={printVisit} services={services} />}
     </div>
   );
 }
