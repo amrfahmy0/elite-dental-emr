@@ -274,6 +274,7 @@ export default function PrescriptionPrint({ visit, patient, triggerLabel = 'Prin
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Prescription_${patient.first_name}_${patient.last_name}_${visit.id.slice(0, 8)}`,
+    ignoreGlobalStyles: true,
     pageStyle: `
       @page { size: A4 portrait; margin: 0; }
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
