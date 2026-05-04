@@ -9,6 +9,7 @@ import {
   DollarSign, Stethoscope, Clock, Camera, FlaskConical, FileImage,
   Trash2, Edit2, ZoomIn, ZoomOut, RotateCw, ExternalLink, Download
 } from 'lucide-react';
+import PrescriptionPrint from '@/components/PrescriptionPrint';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 function getPublicFileUrl(storagePath: string) {
@@ -132,52 +133,6 @@ function FileViewerModal({ attachment, onClose }: { attachment: Attachment; onCl
   );
 }
 
-function PrescriptionPrint({ visit, patient }: { visit: Visit & { doctor: AppUser }; patient: Patient }) {
-  return (
-    <div className="print-only fixed inset-0 bg-white text-black p-8 z-[100] hidden print:block">
-      <div className="max-w-lg mx-auto border-2 border-navy-900 p-6 rounded-lg">
-        <div className="text-center border-b pb-4 mb-4">
-          <h1 className="text-2xl font-bold">Elite Dental Studio</h1>
-          <p className="text-sm text-gray-600">Premium Dental Care · HIPAA Compliant</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-          <div><strong>Patient:</strong> {patient.first_name} {patient.last_name}</div>
-          <div><strong>ID:</strong> {patient.patient_id}</div>
-          <div><strong>Doctor:</strong> {visit.doctor?.full_name?.startsWith('Dr.') ? visit.doctor.full_name : `Dr. ${visit.doctor?.full_name}`}</div>
-          <div><strong>Date:</strong> {new Date(visit.visit_date).toLocaleDateString()}</div>
-          {visit.tooth_numbers && <div className="col-span-2"><strong>Tooth #:</strong> {visit.tooth_numbers}</div>}
-          {visit.procedure_performed && <div className="col-span-2"><strong>Procedure:</strong> {visit.procedure_performed}</div>}
-        </div>
-        <div className="border-t pt-4">
-          <h3 className="font-bold mb-2">℞ Prescription</h3>
-          {(() => {
-            if (!visit.prescription) return <p className="text-sm text-gray-500">No prescription issued.</p>;
-            try {
-              const parsed = JSON.parse(visit.prescription);
-              if (Array.isArray(parsed)) {
-                return (
-                  <ul className="list-disc pl-5 text-sm space-y-1">
-                    {parsed.map((med: { name: string; amount: string; frequency: string; duration: string }, i: number) => (
-                      <li key={i}>
-                        <strong>{med.name}</strong>: Take {med.amount} pill(s) every {med.frequency} hours for {med.duration} days.
-                      </li>
-                    ))}
-                  </ul>
-                );
-              }
-              return <p className="text-sm whitespace-pre-wrap">{visit.prescription}</p>;
-            } catch {
-              return <p className="text-sm whitespace-pre-wrap">{visit.prescription}</p>;
-            }
-          })()}
-        </div>
-        <div className="border-t mt-4 pt-4 text-xs text-gray-500 text-center">
-          This prescription is valid for 30 days from the issue date.
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Visit Timeline Item ──────────────────────────────────────────────────────
 function VisitTimelineItem({ visit, patient, onEdit, onDelete }: { visit: Visit & { doctor: AppUser; attachments: Attachment[] }; patient: Patient; onEdit: () => void; onDelete: () => void }) {
