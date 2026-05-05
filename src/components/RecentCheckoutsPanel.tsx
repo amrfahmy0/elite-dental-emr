@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { getVisitDetailsAction } from '@/app/actions';
+import { getVisitDetailsAction, getSessionTokenAction } from '@/app/actions';
 import { BillingInvoice } from './BillingNotifier';
 import InvoicePrint from './InvoicePrint';
 import { Clock, CheckCircle, AlertCircle, Printer } from 'lucide-react';
 
-export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits: any[] }) {
-  const [visits, setVisits] = useState(initialVisits);
+export default function RecentCheckoutsPanel({ initialVisits = [] }: { initialVisits: any[] }) {
+  const [visits, setVisits] = useState(initialVisits || []);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);
   const [services, setServices] = useState<any[]>([]);
 
@@ -17,35 +18,60 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
       if (data) setServices(data);
     });
 
-    const channel = supabase
-      .channel('recent-checkouts')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'visits' },
-        async (payload) => {
-          const { data: newVisit } = await getVisitDetailsAction(payload.new.id);
-          if (newVisit) {
-            setVisits((prev) => [newVisit, ...prev].slice(0, 5));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'visits' },
-        async (payload) => {
-          const { data: updatedVisit } = await getVisitDetailsAction(payload.new.id);
-          if (updatedVisit) {
-            setVisits((prev) => prev.map((v) => (v.id === updatedVisit.id ? updatedVisit : v)));
-            if (selectedVisit?.id === updatedVisit.id) {
-              setSelectedVisit(updatedVisit);
+    let channel: any;
+    let authClient: any;
+
+    async function setupRealtime() {
+      const token = await getSessionTokenAction();
+      console.log("[RecentCheckouts] Realtime Token Status:", token ? "PRESENT" : "MISSING");
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_anon_key';
+      
+      authClient = createClient(supabaseUrl, supabaseAnonKey);
+      if (token) {
+        authClient.realtime.setAuth(token);
+      }
+
+      channel = authClient
+        .channel('recent-checkouts')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'visits' },
+          async (payload: any) => {
+            if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
+            const newVisitId = payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
+            const { data: newVisit } = await getVisitDetailsAction(newVisitId);
+            if (newVisit) {
+              setVisits((prev) => {
+                const filtered = prev.filter(v => v.id !== newVisit.id);
+                return [newVisit, ...filtered].slice(0, 5);
+              });
             }
           }
-        }
-      )
-      .subscribe();
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'visits' },
+          async (payload: any) => {
+            const { data: updatedVisit } = await getVisitDetailsAction(payload.new.id);
+            if (updatedVisit) {
+              setVisits((prev) => prev.map((v) => (v.id === updatedVisit.id ? updatedVisit : v)));
+              if (selectedVisit?.id === updatedVisit.id) {
+                setSelectedVisit(updatedVisit);
+              }
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    setupRealtime();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel && authClient) {
+        authClient.removeChannel(channel);
+      }
     };
   }, [selectedVisit]);
 
@@ -57,18 +83,18 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {visits.map((visit) => {
-          const pt = visit.patient;
-          const remaining = (visit.total_cost || 0) + (visit.previous_balance || 0) - (visit.amount_paid || 0);
+        {(visits || []).map((visit) => {
+          const pt = visit?.patient || {};
+          const remaining = (visit?.total_cost || 0) + (visit?.previous_balance || 0) - (visit?.amount_paid || 0);
           // If they've paid anything (even partial), or if there's no remaining balance, it's considered 'processed'
-          const needsAttention = remaining > 0 && (visit.amount_paid || 0) === 0;
+          const needsAttention = remaining > 0 && (visit?.amount_paid || 0) === 0;
 
           return (
-            <button
-              key={visit.id}
+            <div
+              key={visit?.id}
               onClick={() => setSelectedVisit(visit)}
-              className={`w-full text-left p-3 rounded-xl border transition-all hover:scale-[1.02] ${
-                selectedVisit?.id === visit.id
+              className={`w-full text-left p-3 rounded-xl border transition-all hover:scale-[1.02] cursor-pointer ${
+                selectedVisit?.id === visit?.id
                   ? 'bg-white/10 border-white/20'
                   : 'bg-black/20 border-white/5 hover:bg-black/30'
               }`}
@@ -76,10 +102,10 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-[#E8E8F0]">
-                    {pt?.first_name} {pt?.last_name}
+                    {pt?.first_name || 'Unknown'} {pt?.last_name || 'Patient'}
                   </p>
-                  <p className="text-[10px] text-[#8A8A9A] mt-0.5">
-                    {new Date(visit.visit_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <p suppressHydrationWarning className="text-[10px] text-[#8A8A9A] mt-0.5">
+                    {visit?.visit_date ? new Date(visit.visit_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>
                 </div>
                 {needsAttention ? (
@@ -87,23 +113,25 @@ export default function RecentCheckoutsPanel({ initialVisits }: { initialVisits:
                 ) : (
                   <CheckCircle className="w-4 h-4 text-emerald-500" />
                 )}
-                <InvoicePrint
-                  visit={visit}
-                  services={services}
-                  trigger={
-                    <button
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 transition-all text-[#C9A84C]"
-                      title="Print Invoice"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
-                  }
-                />
+                <div onClick={(e) => e.stopPropagation()}>
+                  <InvoicePrint
+                    visit={visit}
+                    services={services}
+                    trigger={
+                      <button
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 transition-all text-[#C9A84C]"
+                        title="Print Invoice"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    }
+                  />
+                </div>
               </div>
-            </button>
+            </div>
           );
         })}
-        {visits.length === 0 && (
+        {(!visits || visits.length === 0) && (
           <p className="text-xs text-[#8A8A9A] text-center mt-4">No recent checkouts</p>
         )}
       </div>

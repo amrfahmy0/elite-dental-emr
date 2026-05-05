@@ -1,18 +1,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { getVisitDetailsAction, updateVisitPaymentAction } from '@/app/actions';
+import { getVisitDetailsAction, updateVisitPaymentAction, getSessionTokenAction } from '@/app/actions';
 import { Receipt, AlertTriangle, CheckCircle, Wallet, Calendar, ArrowRight, Info, Printer } from 'lucide-react';
 import InvoicePrint from './InvoicePrint';
 
 export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { visit: any; toastId?: string | number; onDismiss?: () => void; services?: any[] }) {
-  const pt = visit.patient;
-  const visitCost = visit.total_cost || 0;
-  const previousBalance = visit.previous_balance || 0;
+  console.log("Selected Visit Data:", visit);
+  
+  const pt = visit?.patient || {};
+  const visitCost = Number(visit?.total_cost) || 0;
+  const previousBalance = Number(visit?.previous_balance) || 0;
   const grandTotal = visitCost + previousBalance;
-  const paid = visit.amount_paid || 0;
+  const paid = Number(visit?.amount_paid) || 0;
   const remaining = grandTotal - paid;
   
   const [payment, setPayment] = useState(remaining > 0 ? remaining : 0);
@@ -23,21 +26,17 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
   const handlePay = async () => {
     if (payment <= 0) return;
     setIsSubmitting(true);
-    const { error } = await updateVisitPaymentAction(visit.id, payment);
+    const { error } = await updateVisitPaymentAction(visit?.id, payment);
     setIsSubmitting(false);
     if (!error) {
-      toast.success(`Collected ${payment} EGP from ${pt.first_name}`);
+      toast.success(`Collected ${payment} EGP from ${pt?.first_name || 'Patient'}`);
       setIsSuccess(true);
     } else {
       toast.error(error);
     }
   };
 
-  useEffect(() => {
-    if (isSuccess && setPrintVisit) {
-      setPrintVisit({...visit, amount_paid: (visit.amount_paid || 0) + payment});
-    }
-  }, [isSuccess, payment, setPrintVisit, visit]);
+
 
   if (isSuccess) {
     return (
@@ -45,7 +44,7 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
         <div className="glass-card-light p-5 rounded-xl shadow-2xl border w-full max-w-sm pointer-events-auto text-center" style={{ borderColor: 'rgba(16,185,129,0.4)', background: '#0B1220' }}>
           <CheckCircle className="w-16 h-16 text-[#10B981] mx-auto mb-4" />
           <h3 className="text-xl font-bold text-[#E8E8F0] mb-2">Payment Recorded Successfully</h3>
-          <p className="text-sm text-[#8A8A9A] mb-6">The invoice for {pt.first_name} {pt.last_name} has been updated.</p>
+          <p className="text-sm text-[#8A8A9A] mb-6">The invoice for {pt?.first_name} {pt?.last_name} has been updated.</p>
           
           <div className="flex gap-3">
             <button onClick={() => {
@@ -57,7 +56,7 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
               No, Close
             </button>
             <InvoicePrint 
-              visit={{...visit, amount_paid: (visit.amount_paid || 0) + payment}} 
+              visit={{...visit, amount_paid: (visit?.amount_paid || 0) + payment}} 
               services={services}
               trigger={
                 <button
@@ -84,12 +83,12 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
         <span className="text-xs text-[#5A5A6A]">Just now</span>
       </div>
       
-      <p className="font-bold text-base mb-0.5" style={{ color: '#E8E8F0' }}>{pt.first_name} {pt.last_name}</p>
+      <p className="font-bold text-base mb-0.5" style={{ color: '#E8E8F0' }}>{pt?.first_name} {pt?.last_name}</p>
       
-      {visit.procedure_performed && (
+      {visit?.procedure_performed && (
         <p className="text-xs mt-3 mb-4 p-2 rounded-lg" style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C' }}>
           <span className="block text-[9px] uppercase tracking-wider opacity-70 mb-0.5">Procedure(s)</span>
-          {visit.procedure_performed}
+          {visit?.procedure_performed}
         </p>
       )}
 
@@ -157,7 +156,7 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
       )}
 
       {/* Section B: Follow-up Action */}
-      {visit.next_visit_plan && (
+      {visit?.next_visit_plan && (
         <div className="mt-4 pt-4 border-t border-white/10">
           <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30">
             <div className="flex items-center gap-2 mb-2">
@@ -165,10 +164,10 @@ export function BillingInvoice({ visit, toastId, onDismiss, services = [] }: { v
               <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Doctor&apos;s Note for Next Visit</span>
             </div>
             <p className="text-sm text-blue-100 font-semibold leading-snug mb-3">
-              {visit.next_visit_plan}
+              {visit?.next_visit_plan}
             </p>
             <a 
-              href={`/receptionist/dashboard?patientId=${pt.id}&service=${encodeURIComponent(visit.next_visit_plan)}`}
+              href={`/receptionist/dashboard?patientId=${pt?.id || ''}&service=${encodeURIComponent(visit?.next_visit_plan || '')}`}
               onClick={() => {
                 if (toastId) toast.dismiss(toastId);
                 if (onDismiss) onDismiss();
@@ -199,35 +198,67 @@ export default function BillingNotifier() {
   useEffect(() => setIsMounted(true), []);
 
   useEffect(() => {
-    if (!isMounted) return;
     supabase.from('services').select('*').then(({ data }) => {
       if (data) setServices(data);
     });
 
-    const channel = supabase
-      .channel('public:visits')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'visits' },
-        async (payload) => {
-          const newVisitId = payload.new.id;
-          const { data: visit } = await getVisitDetailsAction(newVisitId);
-          
-          if (visit && visit.patient) {
-            // Play cash register / notification sound
-            try {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
-              audio.play().catch(() => {});
-            } catch (e) {}
+    let channel: any;
+    let authClient: any;
 
-            toast.custom((t) => <BillingInvoice visit={visit} toastId={t} services={services} />, { duration: 120000, position: 'top-center' });
+    async function setupRealtime() {
+      const token = await getSessionTokenAction();
+      console.log("[BillingNotifier] Realtime Token Status:", token ? "PRESENT" : "MISSING (You may need to logout and login again)");
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_anon_key';
+      
+      authClient = createClient(supabaseUrl, supabaseAnonKey);
+      if (token) {
+        authClient.realtime.setAuth(token);
+      } else {
+        console.warn("[BillingNotifier] Connecting to realtime without auth token. RLS might block events.");
+      }
+
+      channel = authClient
+        .channel('public:visits')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'visits' },
+          async (payload: any) => {
+            console.log('Supabase realtime payload:', payload);
+            if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
+            
+            const newVisitId = payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
+            if (!newVisitId) return;
+
+            try {
+              const { data: visit } = await getVisitDetailsAction(newVisitId);
+              
+              if (visit && visit.patient) {
+                // Play cash register / notification sound
+                try {
+                  const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+                  audio.play().catch(() => {});
+                } catch (e) {}
+
+                toast.custom((t) => <BillingInvoice visit={visit} toastId={t} services={services} />, { duration: 120000, position: 'top-center' });
+              } else {
+                console.warn("[BillingNotifier] Visit or patient missing in DB, skipping toast.");
+              }
+            } catch (error) {
+              console.error('Error fetching visit details:', error);
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    }
+
+    setupRealtime();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel && authClient) {
+        authClient.removeChannel(channel);
+      }
     };
   }, []);
 

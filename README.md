@@ -15,7 +15,9 @@
 
 ## 🌟 Executive Summary
 
-**Elite Dental Studio EMR** is a production-ready Software-as-a-Service (SaaS) application engineered to orchestrate the entire clinical workflow. Designed to replace fragmented, legacy desktop software, this platform bridges the communication gap between the **Front Desk Reception** and the **Doctor's Operatory** in real-time. 
+**Elite Dental Studio EMR** is a premium, bespoke Electronic Medical Record (EMR) solution tailored exclusively for individual dental practices. Unlike generic Multi-Tenant SaaS platforms, this system is deployed on a **Single-Tenant architecture**. This means each clinic receives its own isolated database, custom branding (logo and color themes), and bespoke feature flags tailored to their specific workflow.
+
+Designed to replace fragmented, legacy desktop software, this platform bridges the communication gap between the **Front Desk Reception** and the **Doctor's Operatory** in real-time. By providing complete data sovereignty and a custom-tailored experience, it dramatically increases patient throughput and minimizes administrative overhead.
 
 By eliminating physical handoffs, automating billing synchronization, and providing a dynamic digital prescription engine, Elite Dental Studio dramatically increases patient throughput, minimizes administrative overhead, and maximizes financial accuracy—providing massive business value for modern dental enterprises.
 
@@ -118,6 +120,37 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 npm run dev
 ```
 Navigate to `http://localhost:3000`. You will be directed to the login portal. 
+
+### 5. Database Initialization
+This project requires specific PostgreSQL tables to function properly.
+1. Open your Supabase project dashboard.
+2. Navigate to the **SQL Editor**.
+3. Run the SQL commands provided in the `database/schema.sql` file (or your schema creation script) to initialize the `users`, `appointments`, and `visits` tables along with their respective Row Level Security (RLS) policies.
+
+### 6. Test Credentials
+Once the database is set up and the development server is running, you can use the following dummy credentials to test the Role-Based Access Control (RBAC):
+
+**Doctor Portal (`/doctor`):**
+- **Email:** doctor@elitedental.com
+- **Password:** password123
+
+**Receptionist Portal (`/receptionist`):**
+- **Email:** reception@elitedental.com
+- **Password:** password123
+
+---
+
+## 🚀 Deployment (Per-Clinic Setup)
+
+Because this is a bespoke, single-tenant solution, deployment is repeated for each new clinic to ensure 100% data isolation and brand customization.
+
+1. **Provision Database:** Create a new project in your Supabase Organization for the specific clinic.
+2. **Deploy UI:** Click the button below to deploy the Next.js application to Vercel.
+   
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/amrfahmy0/elite-dental-emr)
+
+3. **Configure Environment:** During the Vercel deployment flow, input the newly generated Supabase keys for that specific clinic.
+4. **Customize Branding:** Update the CSS variables in `globals.css` (or the clinic's config table) to match their specific brand identity before handing over the domain.
 
 ---
 

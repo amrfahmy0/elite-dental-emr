@@ -14,13 +14,13 @@ interface InvoicePrintProps {
 const InvoiceSheet = React.forwardRef<HTMLDivElement, { visit: any; services: any[] }>(
   function InvoiceSheet({ visit, services }, ref) {
     if (!visit) return null;
-    const pt = visit.patient;
-    const procedures = visit.procedure_performed ? visit.procedure_performed.split(', ') : ['General Visit'];
-    const totalCost = visit.total_cost || 0;
+    const pt = visit?.patient || {};
+    const procedures = visit?.procedure_performed ? visit.procedure_performed.split(', ') : ['General Visit'];
+    const totalCost = visit?.total_cost || 0;
     
     let calculatedTotal = 0;
-    const itemized = procedures.map((proc: string) => {
-      const svc = services.find(s => s.name === proc);
+    const itemized = (procedures || []).map((proc: string) => {
+      const svc = (services || []).find(s => s?.name === proc);
       const price = svc ? svc.price : 0;
       calculatedTotal += price;
       return { name: proc, price };
@@ -57,15 +57,15 @@ const InvoiceSheet = React.forwardRef<HTMLDivElement, { visit: any; services: an
             </div>
             <div style={{ textAlign: 'right' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1f2937', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px', marginTop: 0 }}>Invoice</h2>
-              <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}><strong>Date:</strong> {new Date(visit.visit_date).toLocaleDateString()}</p>
-              <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}><strong>Invoice #:</strong> INV-{visit.id.slice(0, 8).toUpperCase()}</p>
+              <p suppressHydrationWarning style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}><strong>Date:</strong> {visit?.visit_date ? new Date(visit.visit_date).toLocaleDateString() : ''}</p>
+              <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}><strong>Invoice #:</strong> INV-{visit?.id?.slice(0, 8)?.toUpperCase() || 'UNKNOWN'}</p>
             </div>
           </div>
 
           <div style={{ marginBottom: '32px' }}>
             <h3 style={{ fontWeight: 700, color: '#1f2937', marginBottom: '8px', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '14px', margin: 0 }}>Billed To</h3>
-            <p style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: '0 0 2px 0' }}>{pt.first_name} {pt.last_name}</p>
-            <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}>Patient ID: {pt.patient_id}</p>
+            <p style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: '0 0 2px 0' }}>{pt?.first_name || 'Unknown'} {pt?.last_name || 'Patient'}</p>
+            <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}>Patient ID: {pt?.patient_id || 'N/A'}</p>
           </div>
 
           <table style={{ width: '100%', marginBottom: '32px', fontSize: '14px', color: '#111827', borderCollapse: 'collapse' }}>
@@ -99,19 +99,19 @@ const InvoiceSheet = React.forwardRef<HTMLDivElement, { visit: any; services: an
                 <span>Total Cost</span>
                 <span>{totalCost.toFixed(2)} EGP</span>
               </div>
-              {(visit.previous_balance || 0) > 0 && (
+              {(visit?.previous_balance || 0) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563', marginBottom: '8px' }}>
                   <span>Previous Balance</span>
-                  <span>{visit.previous_balance.toFixed(2)} EGP</span>
+                  <span>{visit?.previous_balance.toFixed(2)} EGP</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid #e5e7eb', paddingTop: '8px', marginBottom: '8px' }}>
                 <span>Amount Paid</span>
-                <span>-{visit.amount_paid?.toFixed(2) || '0.00'} EGP</span>
+                <span>-{visit?.amount_paid?.toFixed(2) || '0.00'} EGP</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '18px', borderTop: '2px solid #1f2937', paddingTop: '8px', marginTop: '8px' }}>
                 <span>Remaining Balance</span>
-                <span>{Math.max(0, totalCost + (visit.previous_balance || 0) - (visit.amount_paid || 0)).toFixed(2)} EGP</span>
+                <span>{Math.max(0, totalCost + (visit?.previous_balance || 0) - (visit?.amount_paid || 0)).toFixed(2)} EGP</span>
               </div>
             </div>
           </div>

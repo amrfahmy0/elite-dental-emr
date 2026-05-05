@@ -59,6 +59,11 @@ export async function logoutAction() {
   redirect('/login');
 }
 
+export async function getSessionTokenAction() {
+  const cookieStore = await cookies();
+  return cookieStore.get('session_token')?.value;
+}
+
 // ─── APPOINTMENTS ──────────────────────────────────────────────────────────
 
 export async function createAppointmentAction(data: {
