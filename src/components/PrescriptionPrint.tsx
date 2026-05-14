@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Printer } from 'lucide-react';
 import type { Visit, Patient, AppUser } from '@/lib/types';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type PrintLang = 'en' | 'ar';
 
 interface Medication {
   name: string;
@@ -19,7 +23,44 @@ interface PrescriptionPrintProps {
   triggerLabel?: string;
 }
 
-// ─── QR Code Placeholder SVG ─────────────────────────────────────────────────
+// ─── Translation helper ────────────────────────────────────────────────────────
+// Keeps all bilingual strings in one place for easy editing.
+const t = (lang: PrintLang, key: string): string => {
+  const translations: Record<string, Record<PrintLang, string>> = {
+    patient:          { en: 'Patient',          ar: 'المريض'                        },
+    age:              { en: 'Age',              ar: 'السن'                           },
+    yrs:              { en: 'yrs',              ar: 'سنة'                            },
+    diagnosis:        { en: 'Diagnosis',        ar: 'التشخيص'                       },
+    date:             { en: 'Date',             ar: 'التاريخ'                        },
+    tooth:            { en: 'Tooth #',          ar: 'سن رقم'                        },
+    clinicalNotes:    { en: 'Clinical Notes',   ar: 'ملاحظات سريرية'                },
+    noMeds:           { en: 'No medications prescribed for this visit.',
+                        ar: 'لا توجد أدوية موصوفة لهذه الزيارة.'                   },
+    validFor:         { en: 'Valid for 30 days from',
+                        ar: 'صالح لمدة 30 يومًا من'                                },
+    signatureStamp:   { en: 'Signature & Stamp', ar: 'التوقيع والختم'              },
+    tabletSingular:   { en: 'tablet',           ar: 'قرص'                           },
+    tabletPlural:     { en: 'tablets',          ar: 'أقراص'                         },
+    every:            { en: 'every',            ar: 'كل'                            },
+    hours:            { en: 'hours',            ar: 'ساعات'                         },
+    forDuration:      { en: 'for',              ar: 'لمدة'                          },
+    days:             { en: 'days',             ar: 'أيام'                          },
+    qrCaption:        { en: 'Scan to book your follow-up appointment',
+                        ar: 'امسح الكود لحجز موعدك القادم'                         },
+    subtitleEn:       { en: 'Premium Dental Care · Est. 2019',
+                        ar: 'رعاية أسنان متميزة · تأسست 2019'                     },
+    bds:              { en: 'B.D.S · M.Sc. Oral Surgery',
+                        ar: 'بكالوريوس طب الأسنان · ماجستير جراحة الفم'           },
+    license:          { en: 'License #: EDS-DOC-0042', ar: 'رقم الترخيص: EDS-DOC-0042' },
+    address:          { en: '📍 123 Health Ave, Medical District, Cairo',
+                        ar: '📍 123 شارع الصحة، الحي الطبي، القاهرة'              },
+    phone:            { en: '📞 +20 100 000 0000 · +20 111 000 0000',
+                        ar: '📞 ٢٠١٠٠٠٠٠٠٠٠+ · ٢٠١١١٠٠٠٠٠٠٠+'                    },
+  };
+  return translations[key]?.[lang] ?? key;
+};
+
+// ─── QR Code Placeholder SVG ──────────────────────────────────────────────────
 function QRCodeSVG() {
   return (
     <svg viewBox="0 0 80 80" width="64" height="64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -60,18 +101,23 @@ function ToothLogo({ size = 44 }: { size?: number }) {
   );
 }
 
-// ─── The actual printable sheet (pure layout, no print: prefixes) ─────────────
+// ─── The actual printable sheet (pure layout, no screen styles) ───────────────
 const PrescriptionSheet = React.forwardRef<
   HTMLDivElement,
-  { visit: Visit & { doctor: AppUser }; patient: Patient }
->(function PrescriptionSheet({ visit, patient }, ref) {
+  { visit: Visit & { doctor: AppUser }; patient: Patient; lang: PrintLang }
+>(function PrescriptionSheet({ visit, patient, lang }, ref) {
+  const isAr = lang === 'ar';
+  const dir = isAr ? 'rtl' : 'ltr';
+
   const doctorName = visit.doctor?.full_name?.startsWith('Dr.')
     ? visit.doctor.full_name
     : `Dr. ${visit.doctor?.full_name ?? 'Unknown'}`;
 
-  const visitDate = new Date(visit.visit_date).toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
+  // Arabic date formatting keeps the same Gregorian calendar but in Arabic locale
+  const visitDate = new Date(visit.visit_date).toLocaleDateString(
+    isAr ? 'ar-EG' : 'en-GB',
+    { day: '2-digit', month: 'long', year: 'numeric' },
+  );
 
   const age = patient.date_of_birth
     ? new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()
@@ -87,18 +133,26 @@ const PrescriptionSheet = React.forwardRef<
     }
   }
 
+  // Arabic font stack — Noto Sans Arabic is widely available on most OSes/printers
+  const fontFamily = isAr
+    ? "'Noto Sans Arabic', 'Segoe UI', Arial, sans-serif"
+    : "'Segoe UI', Arial, sans-serif";
+
   return (
     <div
       ref={ref}
+      dir={dir}
       style={{
         backgroundColor: '#ffffff',
         color: '#000000',
         width: '210mm',
         minHeight: '297mm',
         padding: '20mm 18mm',
-        fontFamily: "'Segoe UI', Arial, sans-serif",
+        fontFamily,
         position: 'relative',
         boxSizing: 'border-box',
+        // Ensure text direction is inherited by all children
+        direction: dir,
       }}
     >
       {/* ── Watermark ── */}
@@ -115,29 +169,32 @@ const PrescriptionSheet = React.forwardRef<
       {/* ── Content ── */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: '257mm' }}>
 
-        {/* ══ HEADER ══ */}
+        {/* ══ HEADER ══
+            Uses flexbox — dir="rtl" on the root already mirrors the row order,
+            so logo ends up on the right in Arabic and left in English. */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           paddingBottom: '16px', marginBottom: '20px',
           borderBottom: '2.5px solid #C9A84C',
         }}>
-          {/* Left: logo + name */}
+          {/* Clinic brand (start side) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <ToothLogo size={48} />
             <div>
-              <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-0.5px', color: '#0B1220', lineHeight: 1 }}>
+              <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: isAr ? '0' : '-0.5px', color: '#0B1220', lineHeight: 1 }}>
                 Elite Dental Studio
               </div>
-              <div style={{ fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A84C', marginTop: '3px' }}>
-                Premium Dental Care · Est. 2019
+              <div style={{ fontSize: '10px', letterSpacing: isAr ? '0' : '2px', textTransform: 'uppercase', color: '#C9A84C', marginTop: '3px' }}>
+                {t(lang, 'subtitleEn')}
               </div>
             </div>
           </div>
-          {/* Right: Doctor */}
-          <div style={{ textAlign: 'right' }}>
+
+          {/* Doctor info (end side) — text-align follows dir automatically */}
+          <div style={{ textAlign: isAr ? 'left' : 'right' }}>
             <div style={{ fontSize: '16px', fontWeight: 700, color: '#0B1220' }}>{doctorName}</div>
-            <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>B.D.S · M.Sc. Oral Surgery</div>
-            <div style={{ fontSize: '11px', color: '#555' }}>License #: EDS-DOC-0042</div>
+            <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{t(lang, 'bds')}</div>
+            <div style={{ fontSize: '11px', color: '#555' }}>{t(lang, 'license')}</div>
           </div>
         </div>
 
@@ -147,72 +204,107 @@ const PrescriptionSheet = React.forwardRef<
           padding: '10px 16px', borderRadius: '8px', marginBottom: '24px',
           backgroundColor: '#f7f7f7', border: '1px solid #e5e5e5',
         }}>
+          {/* Patient name / ID */}
           <div>
-            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>Patient</div>
+            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>
+              {t(lang, 'patient')}
+            </div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: '#0B1220', marginTop: '2px' }}>
               {patient.first_name} {patient.last_name}
             </div>
             <div style={{ fontSize: '11px', color: '#555' }}>ID: {patient.patient_id}</div>
           </div>
+
+          {/* Age */}
           {age !== null && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>Age</div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#0B1220', marginTop: '2px' }}>{age} yrs</div>
+              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>
+                {t(lang, 'age')}
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#0B1220', marginTop: '2px' }}>
+                {age} {t(lang, 'yrs')}
+              </div>
               <div style={{ fontSize: '11px', color: '#555' }}>{patient.gender}</div>
             </div>
           )}
+
+          {/* Diagnosis */}
           {visit.diagnosis && (
             <div style={{ textAlign: 'center', maxWidth: '200px' }}>
-              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>Diagnosis</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0B1220', marginTop: '2px' }}>{visit.diagnosis}</div>
+              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>
+                {t(lang, 'diagnosis')}
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0B1220', marginTop: '2px' }}>
+                {visit.diagnosis}
+              </div>
             </div>
           )}
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>Date</div>
+
+          {/* Date */}
+          <div style={{ textAlign: isAr ? 'left' : 'right' }}>
+            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600 }}>
+              {t(lang, 'date')}
+            </div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: '#0B1220', marginTop: '2px' }}>{visitDate}</div>
             {visit.tooth_numbers && (
-              <div style={{ fontSize: '11px', color: '#555' }}>Tooth #{visit.tooth_numbers}</div>
+              <div style={{ fontSize: '11px', color: '#555' }}>
+                {t(lang, 'tooth')}{visit.tooth_numbers}
+              </div>
             )}
           </div>
         </div>
 
         {/* ══ Rx BODY ══ */}
         <div style={{ flex: 1 }}>
-          {/* Rx symbol + rule */}
+          {/* Rx symbol + rule — ℞ always stays LTR regardless of page direction */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontFamily: 'Georgia, serif', fontSize: '40px', fontWeight: 900, color: '#0B1220', lineHeight: 1 }}>℞</span>
+            <span
+              dir="ltr"
+              style={{ fontFamily: 'Georgia, serif', fontSize: '40px', fontWeight: 900, color: '#0B1220', lineHeight: 1 }}
+            >
+              ℞
+            </span>
             <div style={{ flex: 1, height: '1px', backgroundColor: '#ddd' }} />
           </div>
 
           {/* Medications */}
           {medications.length === 0 ? (
-            <p style={{ fontSize: '13px', fontStyle: 'italic', color: '#aaa' }}>No medications prescribed for this visit.</p>
+            <p style={{ fontSize: '13px', fontStyle: 'italic', color: '#aaa' }}>
+              {t(lang, 'noMeds')}
+            </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {medications.map((med, i) => (
-                <div key={i} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    flexShrink: 0, width: '26px', height: '26px', borderRadius: '50%',
-                    backgroundColor: '#C9A84C', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: 900, marginTop: '2px',
-                  }}>
-                    {i + 1}
+              {medications.map((med, i) => {
+                // Build dosage string respecting language
+                const tabletWord = med.amount !== '1' ? t(lang, 'tabletPlural') : t(lang, 'tabletSingular');
+                const dosageParts = [
+                  med.amount    ? `${med.amount} ${tabletWord}` : null,
+                  med.frequency ? `${t(lang, 'every')} ${med.frequency} ${t(lang, 'hours')}` : null,
+                  med.duration  ? `${t(lang, 'forDuration')} ${med.duration} ${t(lang, 'days')}` : null,
+                ].filter(Boolean).join(' · ');
+
+                return (
+                  <div key={i} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                    {/* Numbered bullet */}
+                    <div style={{
+                      flexShrink: 0, width: '26px', height: '26px', borderRadius: '50%',
+                      backgroundColor: '#C9A84C', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 900, marginTop: '2px',
+                    }}>
+                      {i + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#0B1220', lineHeight: 1.2 }}>{med.name}</div>
+                      {dosageParts && (
+                        <div style={{ fontSize: '12px', fontStyle: 'italic', color: '#555', marginTop: '3px' }}>
+                          {dosageParts}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#0B1220', lineHeight: 1.2 }}>{med.name}</div>
-                    {(med.amount || med.frequency || med.duration) && (
-                      <div style={{ fontSize: '12px', fontStyle: 'italic', color: '#555', marginTop: '3px' }}>
-                        {[
-                          med.amount ? `${med.amount} tablet${med.amount !== '1' ? 's' : ''}` : null,
-                          med.frequency ? `every ${med.frequency} hours` : null,
-                          med.duration ? `for ${med.duration} days` : null,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -220,7 +312,7 @@ const PrescriptionSheet = React.forwardRef<
           {visit.medical_notes && (
             <div style={{ marginTop: '28px', paddingTop: '14px', borderTop: '1px dashed #ddd' }}>
               <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: '#999', fontWeight: 600, marginBottom: '4px' }}>
-                Clinical Notes
+                {t(lang, 'clinicalNotes')}
               </div>
               <div style={{ fontSize: '12px', fontStyle: 'italic', color: '#444' }}>{visit.medical_notes}</div>
             </div>
@@ -229,16 +321,18 @@ const PrescriptionSheet = React.forwardRef<
           {/* Validity */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '32px' }}>
             <div style={{ flex: 1, height: '1px', backgroundColor: '#eee' }} />
-            <span style={{ fontSize: '10px', color: '#bbb', whiteSpace: 'nowrap' }}>Valid for 30 days from {visitDate}</span>
+            <span style={{ fontSize: '10px', color: '#bbb', whiteSpace: 'nowrap' }}>
+              {t(lang, 'validFor')} {visitDate}
+            </span>
             <div style={{ flex: 1, height: '1px', backgroundColor: '#eee' }} />
           </div>
 
-          {/* Signature */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
+          {/* Signature — always pinned to the end of the line (right in LTR, left in RTL) */}
+          <div style={{ display: 'flex', justifyContent: isAr ? 'flex-start' : 'flex-end', marginTop: '32px' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: '160px', height: '1px', backgroundColor: '#0B1220', marginBottom: '4px' }} />
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#0B1220' }}>{doctorName}</div>
-              <div style={{ fontSize: '10px', color: '#999' }}>Signature &amp; Stamp</div>
+              <div style={{ fontSize: '10px', color: '#999' }}>{t(lang, 'signatureStamp')}</div>
             </div>
           </div>
         </div>
@@ -250,14 +344,15 @@ const PrescriptionSheet = React.forwardRef<
           display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#0B1220' }}>📍 123 Health Ave, Medical District, Cairo</div>
-            <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>📞 +20 100 000 0000 · +20 111 000 0000</div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#0B1220' }}>{t(lang, 'address')}</div>
+            <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{t(lang, 'phone')}</div>
             <div style={{ fontSize: '11px', color: '#C9A84C', marginTop: '2px' }}>@EliteDentalStudio · @EliteDentalCairo</div>
           </div>
+          {/* QR block — column direction so stacking is direction-agnostic */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <QRCodeSVG />
-            <div style={{ fontSize: '8px', color: '#888', textAlign: 'center', maxWidth: '80px', lineHeight: 1.3 }}>
-              Scan to book your follow-up
+            <div style={{ fontSize: '8px', color: '#888', textAlign: 'center', maxWidth: '90px', lineHeight: 1.3 }}>
+              {t(lang, 'qrCaption')}
             </div>
           </div>
         </div>
@@ -267,9 +362,10 @@ const PrescriptionSheet = React.forwardRef<
   );
 });
 
-// ─── Public component: owns the ref + print trigger ──────────────────────────
+// ─── Public component: owns the ref, language state, toggle UI + print trigger ─
 export default function PrescriptionPrint({ visit, patient, triggerLabel = 'Print Prescription' }: PrescriptionPrintProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [printLang, setPrintLang] = useState<PrintLang>('en');
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -287,19 +383,68 @@ export default function PrescriptionPrint({ visit, patient, triggerLabel = 'Prin
 
   return (
     <>
-      {/* Trigger button — visible on screen */}
-      <button
-        onClick={onPrintClick}
-        className="mt-2 flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all hover:scale-105"
-        style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }}
-      >
-        <Printer className="w-3.5 h-3.5" />
-        {triggerLabel}
-      </button>
+      {/* ── Language toggle + print button row ── */}
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+
+        {/* Segmented control */}
+        <div
+          className="flex items-center rounded-lg overflow-hidden"
+          style={{
+            background: 'rgba(201,168,76,0.08)',
+            border: '1px solid rgba(201,168,76,0.18)',
+          }}
+          role="group"
+          aria-label="Print language"
+        >
+          {/* English option */}
+          <button
+            onClick={() => setPrintLang('en')}
+            className="px-3 py-1 text-xs font-semibold transition-all duration-200"
+            style={
+              printLang === 'en'
+                ? { background: '#C9A84C', color: '#070E1A' }
+                : { background: 'transparent', color: '#C9A84C' }
+            }
+            aria-pressed={printLang === 'en'}
+          >
+            EN
+          </button>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '20px', background: 'rgba(201,168,76,0.25)' }} />
+
+          {/* Arabic option */}
+          <button
+            onClick={() => setPrintLang('ar')}
+            className="px-3 py-1 text-xs font-bold transition-all duration-200"
+            style={
+              printLang === 'ar'
+                ? { background: '#C9A84C', color: '#070E1A' }
+                : { background: 'transparent', color: '#C9A84C' }
+            }
+            aria-pressed={printLang === 'ar'}
+            // The Arabic label itself is always RTL regardless of page direction
+            dir="rtl"
+          >
+            عربي
+          </button>
+        </div>
+
+        {/* Print trigger */}
+        <button
+          onClick={onPrintClick}
+          className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all hover:scale-105"
+          style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.2)' }}
+        >
+          <Printer className="w-3.5 h-3.5" />
+          {triggerLabel}
+          {printLang === 'ar' && <span className="opacity-60 text-[10px]">(عربي)</span>}
+        </button>
+      </div>
 
       {/* Hidden sheet — rendered off-screen, picked up by react-to-print */}
       <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', pointerEvents: 'none' }}>
-        <PrescriptionSheet ref={printRef} visit={visit} patient={patient} />
+        <PrescriptionSheet ref={printRef} visit={visit} patient={patient} lang={printLang} />
       </div>
     </>
   );
