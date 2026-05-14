@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface FinancialAnalyticsProps {
   visits: Visit[];
@@ -60,7 +61,6 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
       setExpenseForm({ amount: '', category: 'Supplies', payee: '' });
       setReceiptFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      // Toast notification would go here in a full implementation
     } else {
       console.error("Failed to save expense:", error);
       alert(`Failed to save expense: ${error}`);
@@ -162,12 +162,11 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
     }));
 
     // Vibrant distinct color palette to guarantee differentiation
-    const COLORS = ['#4F9CF9', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308', '#F43F5E', '#14B8A6', '#C9A84C', '#6366F1'];
+    const COLORS = ['#4F9CF9', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308', '#F43F5E', '#14B8A6', '#D4AF37', '#6366F1'];
     let colorIndex = 0;
     
     const procedureData = Array.from(procedureMap.entries())
       .map(([name, val]) => {
-        // Enforce a distinct color for every procedure slice to ensure they are visually separate
         const color = COLORS[colorIndex++ % COLORS.length];
         return {
           name: name.length > 25 ? name.slice(0,25) + '...' : name,
@@ -186,7 +185,6 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
           id: d.id,
           name: d.name,
           phone: d.phone,
-          // Since we no longer track the exact timestamp of the newest visit inside the array mapping, we just display 'Current' or fetch it from the original visits array
           lastVisit: new Date(visits.find(v => v.patient_id === d.id)?.visit_date || 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           owed: d.owedAllTime
         };
@@ -262,374 +260,390 @@ export default function FinancialAnalytics({ visits, services, expenses: initial
   };
 
   return (
-    <div className="space-y-4 mb-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold" style={{ color: '#E8E8F0' }}>Financial Analytics</h2>
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="bg-[#0B1220] border rounded-lg px-4 py-2 text-sm font-semibold outline-none focus:ring-2 cursor-pointer transition-all hover:bg-white/5"
-          style={{ borderColor: 'rgba(201,168,76,0.3)', color: '#C9A84C' }}
-        >
-          {availableMonths.map(m => {
-            const [y, mo] = m.split('-');
-            const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
-            return (
-              <option key={m} value={m}>
-                {date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </option>
-            );
-          })}
-        </select>
-      </div>
-
-      <div className="flex flex-col xl:flex-row gap-4">
-        {/* Core P&L */}
-        <div className="flex-[1.2] grid grid-cols-2 gap-4">
-          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400">
-                <TrendingUp className="w-3.5 h-3.5" />
-              </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Monthly Revenue</p>
-            </div>
-            <p className="text-xl font-black text-white">{formatCurrency(stats.totalMonthlyRevenue)}</p>
-          </div>
-          
-          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(79,156,249,0.2)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-lg bg-blue-500/20 text-blue-400">
-                <Wallet className="w-3.5 h-3.5" />
-              </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Total Collected</p>
-            </div>
-            <p className="text-xl font-black text-white">{formatCurrency(stats.totalCollected)}</p>
+    <div className="space-y-6 mb-6">
+      <Tabs defaultValue="overview" className="space-y-6">
+        {/* Header Area with Integrated TabsList */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Financial Analytics</h2>
+            <p className="text-xs text-[#94A3B8]">Comprehensive overview & collections management</p>
           </div>
 
-          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.2)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-lg bg-red-500/20 text-red-400">
-                <TrendingDown className="w-3.5 h-3.5" />
-              </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#8A8A9A' }}>Total Expenses</p>
-            </div>
-            <p className="text-xl font-black text-white">{formatCurrency(stats.totalExpenses)}</p>
-          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <TabsList>
+              <TabsTrigger value="overview">Quick Overview</TabsTrigger>
+              <TabsTrigger value="debt">Debt & Collections</TabsTrigger>
+            </TabsList>
 
-          <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.05)' }}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-lg bg-[#C9A84C]/20 text-[#C9A84C]">
-                <Activity className="w-3.5 h-3.5" />
-              </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#C9A84C' }}>Net Profit</p>
-            </div>
-            <p className="text-xl font-black text-[#C9A84C]">{formatCurrency(stats.netProfit)}</p>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-[#090E17] border rounded-xl px-4 py-2 text-sm font-semibold outline-none focus:ring-2 cursor-pointer transition-all hover:bg-white/5"
+              style={{ borderColor: 'rgba(212,175,55,0.3)', color: '#D4AF37' }}
+            >
+              {availableMonths.map(m => {
+                const [y, mo] = m.split('-');
+                const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
+                return (
+                  <option key={m} value={m}>
+                    {date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </option>
+                );
+              })}
+            </select>
           </div>
         </div>
 
-        {/* Debt Metrics */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-4">
-          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(248,113,113,0.1)' }}>
-            <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
-              <Clock className="w-3 h-3 text-red-400/70" /> Previous Balance
-            </p>
-            <p className="text-base font-bold text-red-400">{formatCurrency(stats.previousBalance)}</p>
-          </div>
-          
-          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(251,146,60,0.1)' }}>
-            <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#8A8A9A' }}>
-              <AlertCircle className="w-3 h-3 text-orange-400/70" /> Net Debt Change
-            </p>
-            <p className="text-base font-bold text-orange-400">{formatCurrency(stats.currentMonthBalance)}</p>
-          </div>
-
-          <div className="glass-card-light p-3 rounded-2xl flex flex-col justify-center relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1.5" style={{ color: '#EF4444' }}>
-              <DollarSign className="w-3 h-3" /> Total Outstanding
-            </p>
-            <p className="text-lg font-black text-red-500">{formatCurrency(stats.totalOutstandingBalance)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Row */}
-      <div className="flex flex-col lg:flex-row gap-6 mt-6">
-        
-        {/* Daily Revenue Trend (2/3 width) */}
-        <div className="flex-[2] glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
-          <h3 className="text-sm font-bold mb-6" style={{ color: '#E8E8F0' }}>Daily Revenue Trend</h3>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={realDailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#C9A84C" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#C9A84C" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="date" stroke="#6A6A7A" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#6A6A7A" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
-                <RechartsTooltip
-                  contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(201,168,76,0.2)', borderRadius: '8px', color: '#fff' }}
-                  itemStyle={{ color: '#C9A84C', fontWeight: 'bold' }}
-                />
-                <Area type="monotone" dataKey="revenue" stroke="#C9A84C" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Revenue by Procedure (1/3 width) */}
-        <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col justify-center" style={{ borderColor: 'rgba(201,168,76,0.1)' }}>
-          <h3 className="text-sm font-bold mb-2" style={{ color: '#E8E8F0' }}>Revenue by Procedure</h3>
-          <div className="flex-1 w-full min-h-[300px] flex flex-col justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              {realProcedureData.length > 0 ? (
-                <PieChart>
-                  <Pie
-                    data={realProcedureData}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={70}
-                    outerRadius={95}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {realProcedureData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip
-                    contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(201,168,76,0.2)', borderRadius: '8px', color: '#fff' }}
-                    itemStyle={{ fontWeight: 'bold' }}
-                    formatter={(value: number) => `${formatCurrency(value)}`}
-                  />
-                  <Legend 
-                    verticalAlign="bottom"
-                    align="center"
-                    iconType="circle"
-                    wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
-                  />
-                </PieChart>
-              ) : (
-                <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6A6A7A' }}>
-                  No revenue data for this month
+        {/* ─── TAB 1: QUICK OVERVIEW ────────────────────────────────────────── */}
+        <TabsContent value="overview" className="space-y-6">
+          {/* 3-Column Grid: Monthly Revenue, Total Expenses, Net Profit */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400">
+                  <TrendingUp className="w-3.5 h-3.5" />
                 </div>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">Monthly Revenue</p>
+              </div>
+              <p className="text-xl font-black text-white">{formatCurrency(stats.totalMonthlyRevenue)}</p>
+            </div>
 
-      {/* P&L Tracking Section (Expenses) */}
-      <div className="flex flex-col lg:flex-row gap-6 mt-6">
-        
-        {/* Expense Log Form & Table (2/3 width) */}
-        <div className="flex-[2] flex flex-col gap-6">
-          <div className="glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
-            <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: '#E8E8F0' }}>
-              <Plus className="w-4 h-4 text-red-400" /> Log New Expense
-            </h3>
-            <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1 w-full">
-                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Amount (EGP)</label>
-                <input type="number" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. 500" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1 rounded-lg bg-red-500/20 text-red-400">
+                  <TrendingDown className="w-3.5 h-3.5" />
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">Total Expenses</p>
               </div>
-              <div className="flex-1 w-full">
-                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Category</label>
-                <select className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}>
-                  <option>Supplies</option>
-                  <option>Salaries</option>
-                  <option>Lab Fees</option>
-                  <option>Maintenance</option>
-                  <option>Marketing</option>
-                  <option>Other</option>
-                </select>
+              <p className="text-xl font-black text-white">{formatCurrency(stats.totalExpenses)}</p>
+            </div>
+
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(212,175,55,0.05)' }}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1 rounded-lg bg-[#D4AF37]/20 text-[#D4AF37]">
+                  <Activity className="w-3.5 h-3.5" />
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">Net Profit</p>
               </div>
-              <div className="flex-1 w-full">
-                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Payee / Paid To</label>
-                <input type="text" className="w-full bg-[#0B1220] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. Dental Med" value={expenseForm.payee} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
+              <p className="text-xl font-black text-[#D4AF37]">{formatCurrency(stats.netProfit)}</p>
+            </div>
+          </div>
+
+          {/* Charts Row: Daily Revenue Trend & Revenue by Procedure */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Daily Revenue Trend (2/3 width) */}
+            <div className="flex-[2] glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(212,175,55,0.1)' }}>
+              <h3 className="text-sm font-bold mb-6 text-white">Daily Revenue Trend</h3>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={realDailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#D4AF37" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="date" stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                    <RechartsTooltip
+                      contentStyle={{ backgroundColor: '#090E17', borderColor: 'rgba(212,175,55,0.2)', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#D4AF37', fontWeight: 'bold' }}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex-none">
-                <label className="text-xs font-semibold mb-1.5 block text-[#8A8A9A]">Receipt</label>
-                <div className="relative">
-                  <input type="file" accept="image/*,.pdf" ref={fileInputRef} onChange={e => setReceiptFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  <div className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${receiptFile ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-[#0B1220] text-[#8A8A9A] hover:bg-white/5 border-red-500/30'}`} style={{ borderColor: receiptFile ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)' }}>
-                    <Paperclip className="w-4 h-4" />
-                    <span className="whitespace-nowrap max-w-[80px] truncate">{receiptFile ? receiptFile.name : 'Attach'}</span>
+            </div>
+
+            {/* Revenue by Procedure (1/3 width) */}
+            <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col justify-center" style={{ borderColor: 'rgba(212,175,55,0.1)' }}>
+              <h3 className="text-sm font-bold mb-2 text-white">Revenue by Procedure</h3>
+              <div className="flex-1 w-full min-h-[300px] flex flex-col justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  {realProcedureData.length > 0 ? (
+                    <PieChart>
+                      <Pie
+                        data={realProcedureData}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={70}
+                        outerRadius={95}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {realProcedureData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: '#090E17', borderColor: 'rgba(212,175,55,0.2)', borderRadius: '8px', color: '#fff' }}
+                        itemStyle={{ fontWeight: 'bold' }}
+                        formatter={(value: any) => `${formatCurrency(Number(value))}`}
+                      />
+                      <Legend 
+                        verticalAlign="bottom"
+                        align="center"
+                        iconType="circle"
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span style={{ color: '#F8FAFC', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
+                      />
+                    </PieChart>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-xs text-[#94A3B8]">
+                      No revenue data for this month
+                    </div>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Expense Log Form & Table / Charts — Kept directly accessible below Overview Charts */}
+          <div className="flex flex-col lg:flex-row gap-6 mt-6">
+            {/* Expense Log Form & Table (2/3 width) */}
+            <div className="flex-[2] flex flex-col gap-6">
+              <div className="glass-card-light p-6 rounded-2xl border" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-white">
+                  <Plus className="w-4 h-4 text-red-400" /> Log New Expense
+                </h3>
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-semibold mb-1.5 block text-[#94A3B8]">Amount (EGP)</label>
+                    <input type="number" className="w-full bg-[#090E17] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. 500" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
                   </div>
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-semibold mb-1.5 block text-[#94A3B8]">Category</label>
+                    <select className="w-full bg-[#090E17] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}>
+                      <option>Supplies</option>
+                      <option>Salaries</option>
+                      <option>Lab Fees</option>
+                      <option>Maintenance</option>
+                      <option>Marketing</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-semibold mb-1.5 block text-[#94A3B8]">Payee / Paid To</label>
+                    <input type="text" className="w-full bg-[#090E17] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-red-500/50" style={{ borderColor: 'rgba(239,68,68,0.3)' }} placeholder="e.g. Dental Med" value={expenseForm.payee} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
+                  </div>
+                  <div className="flex-none">
+                    <label className="text-xs font-semibold mb-1.5 block text-[#94A3B8]">Receipt</label>
+                    <div className="relative">
+                      <input type="file" accept="image/*,.pdf" ref={fileInputRef} onChange={e => setReceiptFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                      <div className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${receiptFile ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-[#090E17] text-[#94A3B8] hover:bg-white/5 border-red-500/30'}`} style={{ borderColor: receiptFile ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)' }}>
+                        <Paperclip className="w-4 h-4" />
+                        <span className="whitespace-nowrap max-w-[80px] truncate">{receiptFile ? receiptFile.name : 'Attach'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={handleSaveExpense} disabled={isSaving} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap disabled:opacity-50" style={{ background: '#EF4444', color: '#fff' }}>
+                    {isSaving ? 'Saving...' : 'Save Expense'}
+                  </button>
                 </div>
               </div>
-              <button onClick={handleSaveExpense} disabled={isSaving} className="w-full md:w-auto px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition-all hover:scale-105 whitespace-nowrap disabled:opacity-50" style={{ background: '#EF4444', color: '#fff' }}>
-                {isSaving ? 'Saving...' : 'Save Expense'}
-              </button>
+
+              {/* Monthly Expense Table */}
+              <div className="glass-card-light rounded-2xl border overflow-hidden flex-1 flex flex-col" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                  <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+                    <FileText className="w-4 h-4 text-gray-400" /> Expense Log
+                  </h3>
+                </div>
+                <div className="overflow-y-auto max-h-[250px]">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-[10px] uppercase tracking-wider sticky top-0" style={{ background: '#090E17', color: '#94A3B8' }}>
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Date</th>
+                        <th className="px-4 py-3 font-semibold">Category</th>
+                        <th className="px-4 py-3 font-semibold">Payee</th>
+                        <th className="px-4 py-3 font-semibold text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.02)' }}>
+                      {monthExpenses.length > 0 ? monthExpenses.map(exp => (
+                        <tr key={exp.id} className="transition-colors hover:bg-white/[0.02]">
+                          <td className="px-4 py-3 text-xs text-[#94A3B8]">{new Date(exp.expense_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-white">{exp.category}</td>
+                          <td className="px-4 py-3 text-xs text-[#94A3B8]">
+                            <div className="flex items-center gap-2">
+                              {exp.payee}
+                              {exp.receipt_url && (
+                                <a href={exp.receipt_url} target="_blank" rel="noreferrer" className="text-red-400 hover:text-red-300 transition-colors" title="View Receipt">
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs font-bold text-right text-red-400">{formatCurrency(exp.amount)}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-6 text-center text-xs text-[#94A3B8]">No expenses recorded this month</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses by Category Chart (1/3 width) */}
+            <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col" style={{ borderColor: 'rgba(239,68,68,0.1)' }}>
+              <h3 className="text-sm font-bold mb-6 flex items-center gap-2 text-white">
+                <TrendingDown className="w-4 h-4 text-red-400" /> Expenses by Category
+              </h3>
+              <div className="flex-1 w-full min-h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  {expenseData.length > 0 ? (
+                    <PieChart>
+                      <Pie
+                        data={expenseData}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {expenseData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: '#090E17', borderColor: 'rgba(239,68,68,0.2)', borderRadius: '8px', color: '#fff' }}
+                        itemStyle={{ fontWeight: 'bold' }}
+                        formatter={(value: any) => `${formatCurrency(Number(value))}`}
+                      />
+                      <Legend 
+                        verticalAlign="bottom"
+                        align="center"
+                        iconType="circle"
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span style={{ color: '#F8FAFC', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
+                      />
+                    </PieChart>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-xs text-[#94A3B8]">
+                      No expenses for this month
+                    </div>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ─── TAB 2: DEBT & COLLECTIONS ────────────────────────────────────── */}
+        <TabsContent value="debt" className="space-y-6">
+          {/* 4-Column Grid: Total Collected, Previous Balance, Net Debt Change, Total Outstanding */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(79,156,249,0.2)' }}>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1 rounded-lg bg-blue-500/20 text-blue-400">
+                  <Wallet className="w-3.5 h-3.5" />
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">Total Collected</p>
+              </div>
+              <p className="text-xl font-black text-white">{formatCurrency(stats.totalCollected)}</p>
+            </div>
+
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(248,113,113,0.1)' }}>
+              <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 text-[#94A3B8]">
+                <Clock className="w-3.5 h-3.5 text-red-400/70" /> Previous Balance
+              </p>
+              <p className="text-xl font-bold text-red-400">{formatCurrency(stats.previousBalance)}</p>
+            </div>
+            
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(251,146,60,0.1)' }}>
+              <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 text-[#94A3B8]">
+                <AlertCircle className="w-3.5 h-3.5 text-orange-400/70" /> Net Debt Change
+              </p>
+              <p className="text-xl font-bold text-orange-400">{formatCurrency(stats.currentMonthBalance)}</p>
+            </div>
+
+            <div className="glass-card-light p-4 flex flex-col justify-center rounded-2xl relative overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl" />
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 text-[#EF4444]">
+                <DollarSign className="w-3.5 h-3.5" /> Total Outstanding
+              </p>
+              <p className="text-xl font-black text-red-500">{formatCurrency(stats.totalOutstandingBalance)}</p>
             </div>
           </div>
 
-          {/* Monthly Expense Table */}
-          <div className="glass-card-light rounded-2xl border overflow-hidden flex-1 flex flex-col" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-            <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#E8E8F0' }}>
-                <FileText className="w-4 h-4 text-gray-400" /> Expense Log
+          {/* Actionable Debtors Table */}
+          <div className="glass-card-light rounded-2xl border overflow-hidden" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
+            <div className="p-5 border-b" style={{ borderColor: 'rgba(239,68,68,0.1)', background: 'rgba(239,68,68,0.03)' }}>
+              <h3 className="text-sm font-bold flex items-center gap-2 text-[#EF4444]">
+                <AlertCircle className="w-4 h-4" /> Actionable Debtors
               </h3>
+              <p className="text-xs mt-1 text-[#94A3B8]">Patients actively contributing to the Total Outstanding Balance</p>
             </div>
-            <div className="overflow-y-auto max-h-[250px]">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-[10px] uppercase tracking-wider sticky top-0" style={{ background: '#0B1220', color: '#8A8A9A' }}>
+                <thead className="text-[10px] uppercase tracking-wider" style={{ background: 'rgba(255,255,255,0.02)', color: '#94A3B8' }}>
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Category</th>
-                    <th className="px-4 py-3 font-semibold">Payee</th>
-                    <th className="px-4 py-3 font-semibold text-right">Amount</th>
+                    <th className="px-6 py-4 font-semibold">Patient Name</th>
+                    <th className="px-6 py-4 font-semibold">Contact Info</th>
+                    <th className="px-6 py-4 font-semibold">Last Visit</th>
+                    <th className="px-6 py-4 font-semibold text-right">Owed Amount</th>
+                    <th className="px-6 py-4 font-semibold text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.02)' }}>
-                  {monthExpenses.length > 0 ? monthExpenses.map(exp => (
-                    <tr key={exp.id} className="transition-colors hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>{new Date(exp.expense_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#E8E8F0' }}>{exp.category}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: '#A8A8B8' }}>
-                        <div className="flex items-center gap-2">
-                          {exp.payee}
-                          {exp.receipt_url && (
-                            <a href={exp.receipt_url} target="_blank" rel="noreferrer" className="text-red-400 hover:text-red-300 transition-colors" title="View Receipt">
-                              <ImageIcon className="w-3.5 h-3.5" />
-                            </a>
-                          )}
+                <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                  {realDebtors.length > 0 ? realDebtors.map((debtor) => (
+                    <tr key={debtor.id} className="transition-colors hover:bg-white/[0.02]">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-400">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <span className="font-semibold text-white">{debtor.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-bold text-right text-red-400">{formatCurrency(exp.amount)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-[#94A3B8]">
+                          <Phone className="w-3.5 h-3.5" />
+                          {debtor.phone}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-[#94A3B8]">
+                          <CalendarIcon className="w-3.5 h-3.5" />
+                          {debtor.lastVisit}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right font-black text-[#EF4444]">
+                        {formatCurrency(debtor.owed)}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button className="px-4 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase transition-all hover:scale-105"
+                          style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                          Send Reminder
+                        </button>
+                      </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-xs" style={{ color: '#6A6A7A' }}>No expenses recorded this month</td>
+                      <td colSpan={5} className="px-6 py-8 text-center text-xs text-[#94A3B8]">
+                        No patients with outstanding balances.
+                      </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-
-        {/* Expenses by Category Chart (1/3 width) */}
-        <div className="flex-1 glass-card-light p-6 rounded-2xl border flex flex-col" style={{ borderColor: 'rgba(239,68,68,0.1)' }}>
-          <h3 className="text-sm font-bold mb-6 flex items-center gap-2" style={{ color: '#E8E8F0' }}>
-            <TrendingDown className="w-4 h-4 text-red-400" /> Expenses by Category
-          </h3>
-          <div className="flex-1 w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              {expenseData.length > 0 ? (
-                <PieChart>
-                  <Pie
-                    data={expenseData}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {expenseData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip
-                    contentStyle={{ backgroundColor: '#0B1220', borderColor: 'rgba(239,68,68,0.2)', borderRadius: '8px', color: '#fff' }}
-                    itemStyle={{ fontWeight: 'bold' }}
-                    formatter={(value: number) => `${formatCurrency(value)}`}
-                  />
-                  <Legend 
-                    verticalAlign="bottom"
-                    align="center"
-                    iconType="circle"
-                    wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value) => <span style={{ color: '#E8E8F0', fontSize: '11px', fontWeight: '500' }}>{value}</span>}
-                  />
-                </PieChart>
-              ) : (
-                <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6A6A7A' }}>
-                  No expenses for this month
-                </div>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Actionable Debtors Table (Full Width) */}
-      <div className="mt-6 glass-card-light rounded-2xl border overflow-hidden" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
-        <div className="p-5 border-b" style={{ borderColor: 'rgba(239,68,68,0.1)', background: 'rgba(239,68,68,0.03)' }}>
-          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#EF4444' }}>
-            <AlertCircle className="w-4 h-4" /> Actionable Debtors
-          </h3>
-          <p className="text-xs mt-1" style={{ color: '#8A8A9A' }}>Patients actively contributing to the Total Outstanding Balance</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-[10px] uppercase tracking-wider" style={{ background: 'rgba(255,255,255,0.02)', color: '#8A8A9A' }}>
-              <tr>
-                <th className="px-6 py-4 font-semibold">Patient Name</th>
-                <th className="px-6 py-4 font-semibold">Contact Info</th>
-                <th className="px-6 py-4 font-semibold">Last Visit</th>
-                <th className="px-6 py-4 font-semibold text-right">Owed Amount</th>
-                <th className="px-6 py-4 font-semibold text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-              {realDebtors.length > 0 ? realDebtors.map((debtor) => (
-                <tr key={debtor.id} className="transition-colors hover:bg-white/[0.02]">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-400">
-                        <User className="w-4 h-4" />
-                      </div>
-                      <span className="font-semibold" style={{ color: '#E8E8F0' }}>{debtor.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2" style={{ color: '#A8A8B8' }}>
-                      <Phone className="w-3.5 h-3.5" />
-                      {debtor.phone}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2" style={{ color: '#A8A8B8' }}>
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      {debtor.lastVisit}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-black" style={{ color: '#EF4444' }}>
-                    {formatCurrency(debtor.owed)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button className="px-4 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase transition-all hover:scale-105"
-                      style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-                      Send Reminder
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-xs" style={{ color: '#6A6A7A' }}>
-                    No patients with outstanding balances.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

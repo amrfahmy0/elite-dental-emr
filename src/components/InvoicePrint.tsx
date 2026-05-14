@@ -76,7 +76,7 @@ const InvoiceSheet = React.forwardRef<HTMLDivElement, { visit: any; services: an
               </tr>
             </thead>
             <tbody>
-              {itemized.map((item, i) => (
+              {itemized.map((item: any, i: number) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '12px' }}>{item.name}</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>
